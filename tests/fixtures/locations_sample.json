@@ -1,0 +1,58 @@
+{
+  "meta": { "name": "openaq-api", "website": "/", "page": 1, "limit": 100, "found": 2 },
+  "results": [
+    {
+      "id": 8118,
+      "name": "Karve Road, Pune",
+      "locality": "India",
+      "timezone": "Asia/Kolkata",
+      "country": { "id": 9, "code": "IN", "name": "India" },
+      "owner": { "id": 4, "name": "Unknown Governmental Organization" },
+      "provider": { "id": 119, "name": "AirNow" },
+      "isMobile": false,
+      "isMonitor": true,
+      "instruments": [{ "id": 2, "name": "Government Monitor" }],
+      "sensors": [
+        {
+          "id": 23534,
+          "name": "pm25 µg/m³",
+          "parameter": { "id": 2, "name": "pm25", "units": "µg/m³", "displayName": "PM2.5" }
+        },
+        {
+          "id": 23535,
+          "name": "pm10 µg/m³",
+          "parameter": { "id": 1, "name": "pm10", "units": "µg/m³", "displayName": "PM10" }
+        }
+      ],
+      "coordinates": { "latitude": 18.5018, "longitude": 73.8206 },
+      "bounds": [73.8206, 18.5018, 73.8206, 18.5018],
+      "distance": 4210.5,
+      "datetimeFirst": { "utc": "2019-03-01T04:30:00Z", "local": "2019-03-01T10:00:00+05:30" },
+      "datetimeLast":  { "utc": "2026-08-17T06:00:00Z", "local": "2026-08-17T11:30:00+05:30" }
+    },
+    {
+      "id": 9942,
+      "name": "Hadapsar low-cost node",
+      "locality": "India",
+      "timezone": "Asia/Kolkata",
+      "country": { "id": 9, "code": "IN", "name": "India" },
+      "owner": { "id": 12, "name": "Community" },
+      "provider": { "id": 200, "name": "PurpleAir" },
+      "isMobile": false,
+      "isMonitor": false,
+      "instruments": [{ "id": 19, "name": "PurpleAir PA-II" }],
+      "sensors": [
+        {
+          "id": 44821,
+          "name": "pm25 µg/m³",
+          "parameter": { "id": 2, "name": "pm25", "units": "µg/m³", "displayName": "PM2.5" }
+        }
+      ],
+      "coordinates": { "latitude": 18.5089, "longitude": 73.9260 },
+      "bounds": [73.9260, 18.5089, 73.9260, 18.5089],
+      "distance": 9880.1,
+      "datetimeFirst": { "utc": "2023-06-14T00:00:00Z", "local": "2023-06-14T05:30:00+05:30" },
+      "datetimeLast":  { "utc": "2025-11-02T18:00:00Z", "local": "2025-11-02T23:30:00+05:30" }
+    }
+  ]
+}
