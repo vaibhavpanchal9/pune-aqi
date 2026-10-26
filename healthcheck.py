@@ -13,7 +13,7 @@ and have it shout at you.
 import sys
 from db import get_conn
 
-STALE_HOURS = 3          # how long without data before we call it broken
+STALE_HOURS = 6          # how long without data before we call it broken
 
 
 def main():
