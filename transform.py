@@ -121,6 +121,38 @@ def flatten_latest(payload, source="openaq"):
     return rows
 
 
+def flatten_location_sensors(payload, location_id, stale_days=7):
+    """Turn GET /v3/locations/{id}/sensors into sensor rows with real dates.
+
+    is_active is decided here, once, using an explicit None check.
+    Do not write this as `stale or 999` -- a sensor that reported this hour
+    has stale == 0, and 0 is falsy in Python, so the freshest sensor in the
+    set would be marked dead. That bug shipped in audit_sensors.py v1.
+    """
+    now = datetime.now(timezone.utc)
+    rows = []
+    for s in payload.get("results", []):
+        param = (s.get("parameter") or {}).get("name")
+        if not param:
+            continue
+        last = _parse_dt(s.get("datetimeLast"))
+        summary = s.get("summary") or {}
+        coverage = s.get("coverage") or {}
+        stale = (now - last).days if last is not None else None
+        rows.append({
+            "sensor_id": s["id"],
+            "location_id": location_id,
+            "parameter": param,
+            "units": (s.get("parameter") or {}).get("units"),
+            "datetime_first": _parse_dt(s.get("datetimeFirst")),
+            "datetime_last": last,
+            "observed_count": coverage.get("observedCount"),
+            "avg_value": summary.get("avg"),
+            "is_active": stale is not None and stale <= stale_days,
+        })
+    return rows
+
+
 def summarise_locations(locations, parameter="pm25"):
     """Build the table that goes in docs/data_sources.md (Day 1, task 6).
 

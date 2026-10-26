@@ -121,6 +121,17 @@ def get_location_latest(location_id):
     return _get(f"/locations/{location_id}/latest")
 
 
+def get_location_sensors(location_id):
+    """GET /v3/locations/{id}/sensors
+
+    Unlike the sensors nested inside /v3/locations, these carry each
+    sensor's OWN datetimeFirst, datetimeLast, coverage and summary.
+    That per-sensor detail is the only way to tell a retired sensor from
+    a live one at the same station.
+    """
+    return _get(f"/locations/{location_id}/sensors")
+
+
 def get_sensor_hours(sensor_id, datetime_from=None, datetime_to=None,
                      limit=1000, page=1):
     """Precomputed hourly averages for one sensor.

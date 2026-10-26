@@ -17,16 +17,18 @@ exactly which hour is due.
 """
 
 import sys
+import time
 import logging
 import argparse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from db import (get_conn, insert_measurements, upsert_locations_and_sensors,
-                start_run, finish_run)
-from openaq_client import (get_pune_locations, iter_sensor_hours,
-                           OpenAQError, SLEEP_BETWEEN_CALLS)
-from transform import flatten_locations, flatten_hours
+                upsert_sensor_detail, start_run, finish_run)
+from openaq_client import (get_pune_locations, get_location_sensors,
+                           iter_sensor_hours, OpenAQError, SLEEP_BETWEEN_CALLS)
+from transform import (flatten_locations, flatten_location_sensors,
+                       flatten_hours)
 
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -43,24 +45,66 @@ log = logging.getLogger("ingest")
 
 
 def discover(conn):
-    """Find Pune's PM2.5 stations and save them. Run this before anything else."""
-    log.info("discovering stations near Pune")
-    payload = get_pune_locations(parameters_id=2)
-    locations = flatten_locations(payload)
+    """Find Pune's PM2.5 stations, then fetch each sensor's real date range.
+
+    The second pass matters. /v3/locations gives a station's overall dates,
+    which are the union across every sensor it has ever held. Several Pune
+    stations hold a sensor that died in mid-2022 and a replacement that
+    started in Feb 2025 -- at location level that reads as five unbroken
+    years, when in fact there is a 2.5 year hole in the middle.
+    Only /v3/locations/{id}/sensors exposes that.
+    """
+    log.info("pass 1: finding stations near Pune")
+    locations = flatten_locations(get_pune_locations(parameters_id=2))
     n_loc, n_sensor = upsert_locations_and_sensors(conn, locations)
-    log.info("registry updated: %d locations, %d sensors", n_loc, n_sensor)
-    return n_loc, n_sensor
+    log.info("  %d locations, %d sensors registered", n_loc, n_sensor)
+
+    log.info("pass 2: fetching per-sensor dates (%d requests)", len(locations))
+    total = 0
+    for loc in locations:
+        try:
+            payload = get_location_sensors(loc["location_id"])
+            rows = flatten_location_sensors(payload, loc["location_id"])
+            total += upsert_sensor_detail(conn, rows)
+        except OpenAQError as exc:
+            log.warning("  location %s failed: %s", loc["location_id"], exc)
+        time.sleep(SLEEP_BETWEEN_CALLS)
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM sensors "
+                    "WHERE parameter = 'pm25' AND is_active")
+        n_active = cur.fetchone()[0]
+    log.info("  %d sensor records updated, %d live pm25 sensors", total, n_active)
+    return n_loc, n_active
 
 
 def active_sensors(conn, parameter="pm25"):
-    """Sensor ids we should be polling, newest-data-first."""
+    """Sensor ids worth polling: live, and one per station.
+
+    Two filters, both necessary.
+
+    is_active drops sensors that stopped reporting -- polling a sensor that
+    died in 2022 costs a request per hour forever and returns nothing.
+
+    DISTINCT ON (location_id) drops the duplicates. Four Pune stations expose
+    two pm25 sensors: a retired one and its replacement. Ingesting both would
+    give two series for one physical place, which the database accepts happily
+    because the sensor ids differ, and which only shows up in Week 2 as
+    doubled feature rows.
+
+    Ordering by observed_count keeps the better-covered sensor when a station
+    somehow has two live ones.
+    """
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT s.sensor_id, l.name
+            """SELECT DISTINCT ON (s.location_id)
+                      s.sensor_id, l.name
                FROM sensors s
                JOIN locations l ON l.location_id = s.location_id
-               WHERE s.parameter = %s
-               ORDER BY l.datetime_last DESC NULLS LAST""",
+               WHERE s.parameter = %s AND s.is_active
+               ORDER BY s.location_id,
+                        s.observed_count DESC NULLS LAST,
+                        s.datetime_last DESC NULLS LAST""",
             (parameter,),
         )
         return cur.fetchall()

@@ -26,15 +26,26 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 CREATE TABLE IF NOT EXISTS sensors (
-    sensor_id    INTEGER PRIMARY KEY,         -- OpenAQ's id
-    location_id  INTEGER NOT NULL REFERENCES locations(location_id),
-    parameter    TEXT NOT NULL,               -- 'pm25', 'pm10', 'no2', ...
-    units        TEXT,
-    first_seen   TIMESTAMPTZ NOT NULL DEFAULT now()
+    sensor_id       INTEGER PRIMARY KEY,        -- OpenAQ's id
+    location_id     INTEGER NOT NULL REFERENCES locations(location_id),
+    parameter       TEXT NOT NULL,              -- 'pm25', 'pm10', 'no2', ...
+    units           TEXT,
+    -- Per-sensor dates, NOT the location's. A station can hold a retired
+    -- sensor and a live replacement; the location's own date range is the
+    -- union of both and hides the gap between them. Several Pune stations
+    -- have a 2.5 year hole that is completely invisible at location level.
+    datetime_first  TIMESTAMPTZ,
+    datetime_last   TIMESTAMPTZ,
+    observed_count  INTEGER,
+    avg_value       DOUBLE PRECISION,
+    is_active       BOOLEAN NOT NULL DEFAULT false,
+    first_seen      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_checked    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_sensors_location  ON sensors (location_id);
 CREATE INDEX IF NOT EXISTS idx_sensors_parameter ON sensors (parameter);
+CREATE INDEX IF NOT EXISTS idx_sensors_active    ON sensors (is_active) WHERE is_active;
 
 -- The table that actually matters.
 --
