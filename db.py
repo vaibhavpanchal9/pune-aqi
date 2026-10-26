@@ -14,6 +14,10 @@ def get_conn():
     Returns a psycopg2 connection. The caller is responsible for closing it,
     which is why every use below is wrapped in a `with` block.
     """
+
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return psycopg2.connect(url)
     return psycopg2.connect(
         host=os.getenv("PGHOST", "localhost"),
         port=int(os.getenv("PGPORT", "5432")),
@@ -92,6 +96,32 @@ def upsert_locations_and_sensors(conn, locations):
             execute_values(cur, sensor_sql, sensor_values)
     conn.commit()
     return len(loc_values), len(sensor_values)
+
+
+def upsert_sensor_detail(conn, sensor_rows):
+    """Write per-sensor dates, coverage and the is_active flag."""
+    if not sensor_rows:
+        return 0
+    sql = """
+        INSERT INTO sensors (sensor_id, location_id, parameter, units,
+                             datetime_first, datetime_last, observed_count,
+                             avg_value, is_active)
+        VALUES %s
+        ON CONFLICT (sensor_id) DO UPDATE SET
+            datetime_first = EXCLUDED.datetime_first,
+            datetime_last  = EXCLUDED.datetime_last,
+            observed_count = EXCLUDED.observed_count,
+            avg_value      = EXCLUDED.avg_value,
+            is_active      = EXCLUDED.is_active,
+            last_checked   = now()
+    """
+    values = [(r["sensor_id"], r["location_id"], r["parameter"], r["units"],
+               r["datetime_first"], r["datetime_last"], r["observed_count"],
+               r["avg_value"], r["is_active"]) for r in sensor_rows]
+    with conn.cursor() as cur:
+        execute_values(cur, sql, values)
+    conn.commit()
+    return len(values)
 
 
 def start_run(conn, source, mode):
