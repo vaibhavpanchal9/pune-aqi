@@ -18,7 +18,7 @@ import sys
 
 from db import get_conn
 
-STALE_HOURS = 6          # no successful run for this long = OUR pipeline is broken
+STALE_HOURS = 12          # no successful run for this long = OUR pipeline is broken
 UPSTREAM_HOURS = 6       # NEW: newest reading older than this = THEIR feed is lagging
 
 

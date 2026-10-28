@@ -3,12 +3,32 @@
     python runsql.py sql/00_inventory.sql
     python runsql.py -c "SELECT count(*) FROM measurements"
 
-Statements are split on ';' — so keep ';' out of comments.
+Comments (-- ...) are stripped BEFORE splitting on ';', so a ';' inside a comment is harmless.
+The last comment line before a statement is printed as its label.
 """
 
 import argparse
 
 from db import get_conn
+
+
+def statements(sql):
+    """Yield (label, statement) pairs from a .sql text."""
+    label, code = "", []
+    for line in sql.splitlines():
+        head, _, comment = line.partition("--")
+        if comment.strip() and not head.strip() and not code:
+            label = comment.strip()          # a comment-only line before the statement
+        if head.strip():
+            code.append(head)
+        if ";" in head:
+            stmt = "\n".join(code).replace(";", "").strip()
+            if stmt:
+                yield label, stmt
+            label, code = "", []
+    stmt = "\n".join(code).replace(";", "").strip()
+    if stmt:                                 # a last statement without a ';'
+        yield label, stmt
 
 
 def print_rows(cur):
@@ -31,9 +51,9 @@ def main():
     sql = args.command if args.command else open(args.file, encoding="utf-8").read()
 
     with get_conn() as conn, conn.cursor() as cur:
-        for statement in [s.strip() for s in sql.split(";") if s.strip()]:
-            print(">>", statement.splitlines()[0][:90])
-            cur.execute(statement)
+        for label, stmt in statements(sql):
+            print(">>", (label or stmt.splitlines()[0])[:90])
+            cur.execute(stmt)
             if cur.description is None:          # not a SELECT: nothing to print
                 print(f"-- ok, {cur.rowcount} rows affected\n")
             else:
