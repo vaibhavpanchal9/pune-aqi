@@ -19,6 +19,7 @@ Every number below is from `python runsql.py sql/0N_*.sql` run against Neon on t
   makes one row per hour; `CROSS JOIN` pairs every row of one side with every row of the other.
 - `round(x::numeric, 1)` — one decimal (`::numeric` is a cast; `round` needs it for doubles).
 - `sum(count(*)) OVER ()` — a window function: the total next to each group, no second query.
+- A column alias must say what the column measures. Change the query, change the alias.
 
 ## 01 basics — look before you query
 - Q1 Four tables. `measurements(sensor_id, measured_at timestamptz, value double, source, ingested_at)`;
@@ -73,6 +74,24 @@ Every number below is from `python runsql.py sql/0N_*.sql` run against Neon on t
   Nigdi 17.5 · Katraj 21.7 · Gavalinagar 23.1 · Bhumkar Nagar 24.1 · Bhosari 28.9 · Dhankawadi 36.8 ·
   Hadapsar 42.4 · SPPU 45.6. Primary-station choice confirmed by coverage, not preference.
 
-## 06 exercises (my own)
-- E1 Hadapsar's daily shape vs Pashan's: 
-- E2 First month where
+## 06 exercises (`sql/06_exercises.sql`)
+- E1 Hadapsar (12236449) vs Pashan, by hour of day. Pashan has one peak (10 am, 38.8) and a flat night
+  (~31–32). Hadapsar has two peaks — 8 am (76.5) and 10–11 pm (74.6) — and its night is its worst time,
+  not its calmest; its low is at 2 pm (34.1), earlier than Pashan's 4 pm. The swing is bigger: Hadapsar
+  more than doubles from afternoon to night (34 → 77), Pashan rises ~1.7× (23 → 39). The evening peak is
+  the signature of a roadside/industrial station (evening traffic and burning, trapped by cooling air);
+  Pashan behaves like a suburban one. The `hour` feature means different things at different stations —
+  one reason to forecast one station at a time.
+- E2 First month where "Satisfactory or worse" (>30) crosses 50%: 2025-02 at 85.7%, but that is an 11-day
+  stub of a winter. The first full month over 50% is 2025-11 (68.5%), and it stays above 50 until
+  2026-03 (68.8%). The clean season is May–September: under 6% every month, both years. October 2026
+  is already at 97.3% against 40.4% the previous October — this winter started early or stronger.
+  (Alias renamed to `pct_satisfactory_or_worse`.)
+- E3 Station-months missing more than 100 hours: 135 rows. Network-wide months (every station affected):
+  2026-01 and 2026-08 (13 of 13), 2026-02 (11), 2025-04 (10) — upstream feed, not instruments. Station
+  outages: Hadapsar dead Jun–Sep 2025 (0 rows for four months), Bhosari dead Oct–Dec 2025, Gavalinagar
+  Jan 2026, Bhumkar Nagar Jul–Aug 2026, Dhankawadi mostly dead Mar–Jun 2025. SPPU, Katraj, Dhankawadi,
+  Nigdi appear 14 times each — chronically patchy. Pashan appears 3 times, only in network-wide months:
+  its instrument never failed. Correction to Q14: Hadapsar wasn't "patchy", it was silent four full
+  months — the six-month window hid it; the monthly one showed it. Granularity decides what you can see.
+   
