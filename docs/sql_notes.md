@@ -94,4 +94,53 @@ Every number below is from `python runsql.py sql/0N_*.sql` run against Neon on t
   Nigdi appear 14 times each — chronically patchy. Pashan appears 3 times, only in network-wide months:
   its instrument never failed. Correction to Q14: Hadapsar wasn't "patchy", it was silent four full
   months — the six-month window hid it; the monthly one showed it. Granularity decides what you can see.
+
+
+
+## 07 window functions (29 Oct)
+- Idea: a window function computes a value for each row from its neighbours — `OVER (ORDER BY …)`
+  says who the neighbours are, `PARTITION BY` restarts the window per group, and the frame
+  (`ROWS BETWEEN …` / `RANGE BETWEEN …`) says how many neighbours. GROUP BY collapses rows; a window
+  function keeps them.
+- Q21 `LAG(value)` = previous row's value; hour-to-hour changes at Pashan range −31 to +41 within a
+  day. `4.900000000000006` is double-precision arithmetic: round for display, never compare doubles with `=`.
+- Q22 `measured_at - LAG(measured_at)` = the gap since the previous reading — an outage detector.
+  Pashan's ten longest: 10 d 3 h (10→20 Jan 2026), 6 d 9 h (8→15 Apr 2025), 3 d 12 h (23→27 Oct 2026),
+  3 d 2 h (29 Apr→2 May 2025), 2 d 5 h (23→25 Jun 2026), then 1 d 9 h, 1 d 3 h, 1 d 2 h, 1 d, 23 h.
+  The top four are E3's network-wide months.
+- Q23 ROWS vs RANGE. After the 17-hour hole ending 2026-02-04 01:30, the "previous 24 ROWS" average
+  reached 41 hours back and said 80.4; the "previous 24 HOURS" average, from the 8 hours that existed,
+  said 88.5. After every single missing hour the two differ slightly (27 Jan 05:30: 47.1 vs 45.1).
+  Row arithmetic is only time arithmetic on a regular grid → v_features is built on one.
+- Q24 `RANK() OVER (PARTITION BY day ORDER BY value DESC)`: the worst hour of almost every January 2026
+  day is 04:30–05:30 UTC (10–11 am IST). 21 Jan appears twice — two hours tied at 102.0; RANK gives ties
+  the same rank, ROW_NUMBER would pick one arbitrarily, DENSE_RANK wouldn't skip the next rank. Only
+  23 days: 11–19 Jan are the gap. The partition is by IST date, so 5 Jan's maximum sits at 23:30 UTC on the 4th.
+- Q25 LAG over monthly groups: October 2026 is +29.5 over September — the biggest month-on-month jump
+  in the record (December 2025 was +27.8).
+
+## 08 EXPLAIN
+- Idea: `EXPLAIN (ANALYZE, BUFFERS)` shows the plan and the real time. Read bottom-up; the innermost
+  line is how rows are found (Seq Scan = whole table, Index Scan = jump to rows); "actual time" on the
+  top line is the duration; "Buffers: shared hit" = pages from cache, "read" = from disk.
+- Q26 One station + 7 days: Index Scan on the *time* index, then a Filter on sensor_id that removed 860
+  of 938 rows — the planner chose the time index over the PK because the range is tiny. 1.2 ms.
+- Q27 Time range across all stations: Index Scan on `idx_measurements_time`, 6,228 rows, 2.4 ms warm.
+- Q28 `max(measured_at)`: Index Only Scan Backward + Limit 1 — reads the last index entry and stops.
+  5 pages, 0.03 ms, independent of table size. This is why the healthcheck costs nothing.
+- Q29–Q32 The index I "added" already existed since August (`idx_measurements_time`); the duplicate
+  was dropped. `idx_measurements_sensor (sensor_id, measured_at)` was dropped too: it is a prefix of
+  the PK `(sensor_id, measured_at, source)`. Rule: read `pg_indexes` and the plan before CREATE INDEX.
+- **Q30 vs Q27 — the day's pair: Seq Scan 183.1 ms (1,168 pages read, 140,234 rows discarded) vs
+  Index Scan 2.4 ms, same question. ~75×.**
+
+## 09 v_features
+- Idea: a VIEW is a saved query that behaves like a table. `v_features` = regular hourly grid per
+  sensor (`generate_series` via CROSS JOIN LATERAL) LEFT JOINed to readings, then lags 1/2/3/6/12/24/48/168,
+  rolling 24 h and 168 h means with their counts, IST hour/dow/month, and `y_24h_ahead = LEAD(value, 24)`.
+- Q33 145,609 rows have a full week of history (all stations). Done-when met.
+- Q34 Pashan: 14,830 grid hours, 13,476 with a reading, **10,892 usable training rows** (reading +
+  lag_24 + lag_168 + target present), 2025-02-18 → 2026-10-29.
+- Q35 The 4 Feb gap on the grid: 17 NULL rows; `n_24` counts down to 8; `roll_24` built from what exists;
+  `lag_1` NULL where the previous hour is missing; `y_24h_ahead` NULL
    
