@@ -1,5 +1,6 @@
 -- schema.sql
--- Run once:  psql -h localhost -U postgres -d aqi -f schema.sql
+-- Apply with:  python apply_schema.py   (uses DATABASE_URL if set, else the local PG* settings)
+-- Every statement is IF NOT EXISTS / OR REPLACE, so it is safe to run again and again.
 --
 -- Design note (worth being able to explain in an interview):
 -- OpenAQ v3 is organised as location -> sensor -> measurement.
@@ -64,8 +65,8 @@ CREATE TABLE IF NOT EXISTS measurements (
 );
 
 -- measured_at first: most of your queries filter by time across many sensors.
+-- (This is also what makes healthcheck's max(measured_at) an Index Only Scan Backward, 0.03 ms.)
 CREATE INDEX IF NOT EXISTS idx_measurements_time   ON measurements (measured_at);
-CREATE INDEX IF NOT EXISTS idx_measurements_sensor ON measurements (sensor_id, measured_at);
 
 -- Every run of the ingest job writes one row here, success or failure.
 -- This table is the evidence behind the "ran continuously for N days"
@@ -85,3 +86,52 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
 
 CREATE INDEX IF NOT EXISTS idx_runs_run_at ON ingestion_runs (run_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON ingestion_runs (status);
+
+-- v_features: the training table, built the time-correct way (Step 4, 29 Oct 2026).
+--
+-- Rows are HOURS on a regular grid (generate_series), not readings. On the grid,
+-- "24 rows back" IS "24 hours back", so LAG/LEAD and ROWS frames are safe.
+-- A missing hour is a row with value NULL -- never silently skipped. (On the raw
+-- table, avg over 24 ROWS reached 41 hours back after a 17-hour gap: 80.4 vs 88.5.)
+--
+-- Columns: value at ts; lag_k = value k hours earlier; roll_24 / roll_168 = mean of
+-- the previous 24 / 168 hours, with n_24 / n_168 = how many of those hours existed;
+-- hour/dow/month in IST; y_24h_ahead = value 24 hours later (the forecasting target).
+CREATE OR REPLACE VIEW v_features AS
+WITH ids AS (
+    SELECT sensor_id, min(measured_at) AS first_ts, max(measured_at) AS last_ts
+    FROM measurements
+    GROUP BY sensor_id
+),
+grid AS (
+    SELECT i.sensor_id, g.ts
+    FROM ids i
+    CROSS JOIN LATERAL generate_series(i.first_ts, i.last_ts, interval '1 hour') AS g(ts)
+),
+joined AS (
+    SELECT g.sensor_id, g.ts, m.value
+    FROM grid g
+    LEFT JOIN measurements m
+           ON m.sensor_id = g.sensor_id AND m.measured_at = g.ts AND m.source = 'openaq'
+)
+SELECT sensor_id,
+       ts,
+       value,
+       LAG(value, 1)   OVER w AS lag_1,
+       LAG(value, 2)   OVER w AS lag_2,
+       LAG(value, 3)   OVER w AS lag_3,
+       LAG(value, 6)   OVER w AS lag_6,
+       LAG(value, 12)  OVER w AS lag_12,
+       LAG(value, 24)  OVER w AS lag_24,
+       LAG(value, 48)  OVER w AS lag_48,
+       LAG(value, 168) OVER w AS lag_168,
+       avg(value)   OVER (w ROWS BETWEEN 23  PRECEDING AND CURRENT ROW) AS roll_24,
+       count(value) OVER (w ROWS BETWEEN 23  PRECEDING AND CURRENT ROW) AS n_24,
+       avg(value)   OVER (w ROWS BETWEEN 167 PRECEDING AND CURRENT ROW) AS roll_168,
+       count(value) OVER (w ROWS BETWEEN 167 PRECEDING AND CURRENT ROW) AS n_168,
+       EXTRACT(HOUR  FROM ts AT TIME ZONE 'Asia/Kolkata')::int AS hour_ist,
+       EXTRACT(DOW   FROM ts AT TIME ZONE 'Asia/Kolkata')::int AS dow_ist,
+       EXTRACT(MONTH FROM ts AT TIME ZONE 'Asia/Kolkata')::int AS month_ist,
+       LEAD(value, 24) OVER w AS y_24h_ahead
+FROM joined
+WINDOW w AS (PARTITION BY sensor_id ORDER BY ts);

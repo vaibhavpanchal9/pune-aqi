@@ -32,3 +32,21 @@ don't change the date.
 Upstream note: OpenAQ's Pune feed (all 13 live sensors) stopped at 2026-10-23 14:30 UTC.
 Our job has run every 2 h since 26 Oct and found nothing new; healthcheck reports it as
 UPSTREAM LAG, not as our failure. Track the gap in docs/data_quality.md (Step 5).
+
+
+
+## 2026-10-29 — features are computed on a regular hourly grid, never on raw rows
+
+`LAG(value, 24)` means "24 rows back". On the raw measurements table that is 24 hours back only
+when nothing is missing in between — and 9.2% of Pashan's hours are missing. Measured on 4 Feb 2026,
+after a 17-hour gap: the "24-row" average reached 41 hours back and said 80.4; the true 24-hour
+average was 88.5. Decision: every lag, rolling mean and target is computed on a grid with one row
+per hour (`generate_series` in `v_features`; `asfreq('h')` in pandas), where a missing hour is a NULL
+row. Rows == hours, so row arithmetic is time arithmetic. Verified: `lag_24` equals the reading 24 h
+earlier on all 13,452 checkable rows (sql/09_v_features.sql, Q36).
+
+## 2026-10-29 — indexes: look before adding
+`idx_measurements_time (measured_at)` has existed since August; it makes `max(measured_at)` an Index
+Only Scan Backward (0.03 ms) and the "last N days across stations" query 2.4 ms vs 183 ms as a Seq
+Scan. A duplicate index added today was dropped; `idx_measurements_sensor` was dropped too because
+it is a prefix of the primary key. Rule: read `pg_indexes` and the EXPLAIN plan before CREATE INDEX.
