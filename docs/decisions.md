@@ -50,3 +50,31 @@ earlier on all 13,452 checkable rows (sql/09_v_features.sql, Q36).
 Only Scan Backward (0.03 ms) and the "last N days across stations" query 2.4 ms vs 183 ms as a Seq
 Scan. A duplicate index added today was dropped; `idx_measurements_sensor` was dropped too because
 it is a prefix of the primary key. Rule: read `pg_indexes` and the EXPLAIN plan before CREATE INDEX.
+
+
+## 2026-10-30 — value policy (applied in dataset.py before anything else)
+
+Numbers from `quality_report.py`, sections C and D, 30 Oct 2026. A reading becomes NULL (= missing) if:
+1. `value < 0` — physically impossible. 8 rows, all Park Street Wakad; 0 at Pashan.
+2. `value = 0` — PM2.5 in Pune is never exactly zero; zeros come in flat runs (Nigdi 31 runs,
+   Pashan 6 runs of 0.0), i.e. a stuck instrument. 83 rows at Pashan (0.6%).
+3. `value >= 985` — the instrument ceiling is 1000; 985+ is "off scale". 5 rows table-wide, 0 at Pashan.
+4. The reading belongs to a run of 6 or more identical consecutive values — a frozen sensor
+   (Revenue Colony: 191 h at 225.1; Hadapsar: 121 h at 10.6). The whole run becomes NULL.
+   At Pashan every such run is 0.0 and already caught by rule 2.
+5. The reading is more than 4× above or below BOTH neighbours (spike / dropout). 5 rows at Pashan,
+   e.g. 2026-02-03 07:30 (90.3 → 13.0 → 52.1). Thresholds are deliberately loose: a real Diwali-night
+   spike is 2–3×, not 4×, and a false positive here costs one hour of training data, not a forecast.
+Nothing is ever edited or replaced with a guess; it is removed, and the gap policy decides the rest.
+
+## 2026-10-30 — gap policy (hourly grid; what is filled, what is excluded)
+
+From `quality_report.py` section A, Pashan: 1,354 missing hours — 202 in 163 gaps of 1–2 h, 87 in
+25 gaps of 3–5 h, 380 in 33 gaps of 6–23 h, 685 in 8 gaps of a day or more.
+1. Readings are placed on a regular hourly grid; a missing hour is a NULL row (see 2026-10-29).
+2. A gap of **at most 3 consecutive missing hours is forward-filled** (the last reading carried
+   forward). Justification: hour-to-hour change at Pashan is typically ±10 against levels of 20–100
+   (Q21), so a 1–3 h carry is a small error; beyond 3 h the daily cycle moves (the 9–10 am peak,
+   the 4 pm trough) and a flat carry becomes wrong. This touches at most ~290 of the 1,354 missing
+   hours (≈ 21%).
+3. **Gaps longer than 3 hours stay NULL.** Any training or evaluation row whose
