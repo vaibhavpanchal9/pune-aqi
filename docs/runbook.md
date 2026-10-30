@@ -1,0 +1,58 @@
+# Runbook — pune-aqi
+
+## The system in one paragraph
+A GitHub Actions job (`.github/workflows/ingest.yml`, cron `23 * * * *` UTC) runs `ingest.py --hours-back 72`
+against OpenAQ v3 and writes to a Neon Postgres (project `pune-aqi`, Singapore). `healthcheck.py` runs
+as the job's last step and exits 1 only if OUR last successful run is older than STALE_HOURS (12);
+upstream lag (newest reading older than UPSTREAM_HOURS, 9) is a yellow warning, exit 0. Local work
+uses the same database through `DATABASE_URL` in `.env`. Nothing depends on the laptop being awake.
+
+## Every day
+    python healthcheck.py          # 10 s. Read: runs in last 24h, last run, STATUS.
+
+## Reading the healthcheck
+- `STATUS: OK` — nothing to do.
+- `OK … UPSTREAM LAG` — our job runs; CPCB/OpenAQ is behind. Nothing to fix. If it lasts > 24 h,
+  add the dates to docs/data_quality.md section F.
+- `STATUS: BROKEN` — no successful run for 12 h. Go to github.com/vaibhavpanchal9/pune-aqi/actions:
+  1. No runs at all in the last 12 h → the schedule stalled. Click `ingest` → Run workflow. If it goes
+     green, GitHub skipped slots; if the schedule stays dead for a day, push any commit touching
+     `.github/workflows/ingest.yml` (re-registers the cron).
+  2. Red runs → open the newest, open the red step, read the last 15 lines.
+     - `password authentication failed` / `could not connect` → DATABASE_URL secret is wrong or the
+       Neon password was reset. Fix the secret under Settings → Secrets and variables → Actions.
+     - `401` / `403` from OpenAQ → OPENAQ_KEY secret invalid or rate-limited. Check the key at
+       explore.openaq.org → account; 429s clear by themselves within the hour.
+     - `500` from OpenAQ three times → their outage; the next run retries. Nothing to do.
+     - A Python traceback → a bug. Reproduce locally with the same command, fix, commit, push, Run workflow.
+
+## Where the logs are
+- Cloud: Actions tab → run → `ingest last 72 h` step. GitHub keeps logs 90 days.
+- Local: `logs/ingest.log` (gitignored) — every local run of ingest.py/backfill.py appends to it.
+- Database: `SELECT run_at, mode, status, rows_inserted, error_text FROM ingestion_runs ORDER BY run_at DESC LIMIT 20;`
+  (`python runsql.py -c "..."`). This table is the resume evidence; never delete from it.
+
+## Switching the database
+- Neon (default): `DATABASE_URL=postgresql://…` present in `.env`. All scripts use it.
+- Local Docker Postgres: comment out the DATABASE_URL line in `.env`; scripts fall back to PGHOST/PGPORT/...
+  Note: port 5432 on this Mac is held by a system Postgres (PID 535, user postgres, since Oct 2026);
+  the container `aqi-pg` cannot bind it. Re-create it on 5433 when needed:
+  `docker rm -f aqi-pg && docker run --name aqi-pg -e POSTGRES_PASSWORD=… -e POSTGRES_DB=aqi -p 5433:5432 -d --restart unless-stopped postgres:16`
+  then set `PGPORT=5433` in `.env` and run `python apply_schema.py`.
+
+## Rebuilding from nothing
+    python apply_schema.py            # tables, indexes, v_features (all IF NOT EXISTS / OR REPLACE)
+    python ingest.py --discover       # station registry (19 locations, 13 live PM2.5 sensors)
+    python backfill.py                # Feb 2025 -> today, month by month, skips full months
+    python healthcheck.py
+
+## Secrets
+Live in three places only: `.env` (gitignored), GitHub Actions secrets, later Render env vars.
+Never in code, never in chat, never in a commit. If one leaks: rotate first (Neon: Branches → Roles &
+Databases → Reset password; OpenAQ: account page), then update the three places, then worry about how.
+
+## Known upstream behaviour
+- OpenAQ Pune feed stops occasionally for days (23–27 Oct 2026; 11–19 Jan 2026; 9–10 Apr 2025).
+  The 72-hour lookback refetches the gap automatically when it comes back.
+- CPCB hours are IST hours, stored as UTC :30. Convert only for display.
+- Zeros and long flat runs are stuck instruments, not air (docs/data_quality.md).
