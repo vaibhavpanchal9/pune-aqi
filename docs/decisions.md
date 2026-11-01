@@ -5,6 +5,8 @@ the alternative. This file is where interview answers come from.
 
 ---
 
+
+
 ## 17 Aug 2026 — Store UTC, convert to IST only for display
 
 `measured_at` is `TIMESTAMPTZ` holding UTC. OpenAQ returns both `utc` and
@@ -15,12 +17,16 @@ the hour-of-day feature if local time leaked in.
 
 ---
 
+
+
 ## 17 Aug 2026 — Primary key is (sensor_id, measured_at, source)
 
 Rejected: a surrogate `id` column with a separate unique constraint.
 
 Why: FILL THIS IN. Cover why this makes both the hourly job and the backfill
 safe to re-run.
+
+
 
 ## 2026-10-26 — cloud ingest live; resume clock starts
 
@@ -52,6 +58,7 @@ Scan. A duplicate index added today was dropped; `idx_measurements_sensor` was d
 it is a prefix of the primary key. Rule: read `pg_indexes` and the EXPLAIN plan before CREATE INDEX.
 
 
+
 ## 2026-10-30 — value policy (applied in dataset.py before anything else)
 
 Numbers from `quality_report.py`, sections C and D, 30 Oct 2026. A reading becomes NULL (= missing) if:
@@ -67,6 +74,8 @@ Numbers from `quality_report.py`, sections C and D, 30 Oct 2026. A reading becom
    spike is 2–3×, not 4×, and a false positive here costs one hour of training data, not a forecast.
 Nothing is ever edited or replaced with a guess; it is removed, and the gap policy decides the rest.
 
+
+
 ## 2026-10-30 — gap policy (hourly grid; what is filled, what is excluded)
 
 From `quality_report.py` section A, Pashan: 1,354 missing hours — 202 in 163 gaps of 1–2 h, 87 in
@@ -78,3 +87,15 @@ From `quality_report.py` section A, Pashan: 1,354 missing hours — 202 in 163 g
    the 4 pm trough) and a flat carry becomes wrong. This touches at most ~290 of the 1,354 missing
    hours (≈ 21%).
 3. **Gaps longer than 3 hours stay NULL.** Any training or evaluation row whose
+
+
+
+## 2026-11-01 — the benchmark
+
+Four baselines scored on the last 8 weeks of usable rows at Pashan (5 Sep → 29 Oct 2026, 900 rows,
+24 h gap before the test window; `results/baselines.csv`, `python baselines.py`):
+persistence MAE 7.99 · mean of last 24 h 8.10 · weekly naive 10.93 · climatology 14.13.
+**The benchmark is persistence, MAE 7.99 µg/m³.** Step 8's models are judged against it on the same
+rows; Step 7 replaces this single window with five walk-forward folds, and the benchmark becomes the
+best baseline's mean across folds. All four biases are negative because the window is a rising season;
+climatology (−13.4) is one year of history pretending to be a climate, and is kept as a warning.

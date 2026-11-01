@@ -28,7 +28,7 @@ from db import get_conn
 
 PRIMARY = 12238693
 IST = "Asia/Kolkata"
-LAGS = (1, 2, 3, 6, 12, 24, 48, 168)
+LAGS = (1, 2, 3, 6, 12, 24, 48, 144, 168)   # 144 = one week before the 24 h-ahead target
 MAX_FILL = 3                 # hours; the gap policy
 HORIZON = 24                 # hours ahead
 
