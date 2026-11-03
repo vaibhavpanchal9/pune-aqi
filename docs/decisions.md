@@ -99,3 +99,29 @@ persistence MAE 7.99 · mean of last 24 h 8.10 · weekly naive 10.93 · climatol
 rows; Step 7 replaces this single window with five walk-forward folds, and the benchmark becomes the
 best baseline's mean across folds. All four biases are negative because the window is a rising season;
 climatology (−13.4) is one year of history pretending to be a climate, and is kept as a warning.
+
+
+
+
+## 2026-11-03 — the benchmark, properly
+
+Six walk-forward folds (docs/validation.md), four baselines, `python evaluate.py`,
+`results/baselines_folds.csv`. Persistence wins the mean — **9.36 µg/m³** — and folds 1, 2, 3, 6;
+in the two monsoon folds the mean of the last 24 h (5.38) and climatology (4.10) beat it. Fold 1
+(winter peak, 27 Nov → 9 Jan) is the hardest: 14.95 for persistence, 29.01 for a climatology that
+had never seen a winter. Every model in Step 8 is judged on these six folds through the same harness;
+it must beat 9.36 on the mean, and the fold-1 number decides whether it is worth deploying.
+The 2026-11-01 entry (7.99 on one autumn window) is superseded.
+
+
+
+## 2026-11-03 — the v1 model is ridge regression
+
+Eight models and four baselines through the same harness on six walk-forward folds
+(`docs/experiments.md`, `results/model_comparison.csv`, deterministic). Ridge on all 21 features:
+mean MAE **8.66 µg/m³ vs 9.36 for persistence, −7.5%**; best or within 0.5 of the best in every fold.
+Gradient boosting is best in the three mid-year folds but cannot extrapolate into the first winter
+(24.8; 20.2 predicting the change) and loses on the mean. The simple model wins, and the reason is
+understood. The blend (ridge + boosting-delta, wins folds 2–5) is the candidate for v2 once a second
+winter is in the data. Gate 1 condition (2) is met by ridge, not by boosting; the gate asked for a
+model that beats the best baseline on walk-forward MAE, and this one does.
