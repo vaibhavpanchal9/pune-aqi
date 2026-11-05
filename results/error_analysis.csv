@@ -1,0 +1,27 @@
+dimension,segment,n,mae_model,mae_benchmark,model_minus_benchmark,winner
+fold,1,1015,15.39,14.95,0.44,persistence
+fold,2,673,10.36,11.31,-0.96,ridge
+fold,3,1085,9.42,10.73,-1.31,ridge
+fold,4,1064,5.22,5.91,-0.69,ridge
+fold,5,1024,4.43,5.25,-0.82,ridge
+fold,6,900,7.13,7.99,-0.86,ridge
+month,2025-11,74,10.39,8.94,1.44,persistence
+month,2025-12,733,14.81,14.52,0.3,persistence
+month,2026-01,307,17.43,17.68,-0.25,ridge
+month,2026-02,248,9.71,10.32,-0.61,ridge
+month,2026-03,612,9.66,10.87,-1.21,ridge
+month,2026-04,636,10.21,11.58,-1.37,ridge
+month,2026-05,537,6.12,7.0,-0.88,ridge
+month,2026-06,523,5.11,5.79,-0.69,ridge
+month,2026-07,617,4.55,5.11,-0.57,ridge
+month,2026-08,541,4.14,5.06,-0.93,ridge
+month,2026-09,615,5.91,6.59,-0.68,ridge
+month,2026-10,318,9.08,10.17,-1.1,ridge
+time_of_day,afternoon 12-17,1440,8.19,8.74,-0.55,ridge
+time_of_day,evening 18-23,1380,7.92,8.76,-0.84,ridge
+time_of_day,morning 06-11,1521,9.45,10.3,-0.85,ridge
+time_of_day,night 00-05,1420,8.6,9.11,-0.51,ridge
+level,1 Good (<=30),3231,6.01,6.57,-0.56,ridge
+level,2 Satisfactory (31-60),1554,9.31,11.2,-1.89,ridge
+level,3 Moderate (61-90),696,12.22,13.58,-1.35,ridge
+level,4 Poor or worse (>90),280,24.72,18.64,6.08,persistence

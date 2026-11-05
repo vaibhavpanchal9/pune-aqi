@@ -49,6 +49,20 @@ def evaluate(fit_predict, features, folds, name="model"):
     return pd.concat([out, pd.DataFrame([mean])], ignore_index=True)
 
 
+def predictions(fit_predict, features, folds):
+    """Out-of-sample forecasts for every test row of every fold, as one Series (index = timestamps).
+
+    Each row is forecast by a model that was trained only on data before its fold. Concatenated over the
+    folds this is 48 weeks of honest forecasts -- the material for error analysis.
+    """
+    parts = []
+    for train_idx, test_idx in folds:
+        train = features.loc[train_idx]
+        test = features.loc[test_idx].drop(columns=[TARGET])
+        parts.append(pd.Series(fit_predict(train, test), index=test.index, dtype=float))
+    return pd.concat(parts).sort_index()
+
+
 def summary(tables):
     """Several evaluate() outputs -> one table: rows = models, columns = fold MAEs + mean, sorted by mean."""
     allrows = pd.concat(tables, ignore_index=True)
