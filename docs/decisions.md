@@ -125,3 +125,11 @@ Gradient boosting is best in the three mid-year folds but cannot extrapolate int
 understood. The blend (ridge + boosting-delta, wins folds 2–5) is the candidate for v2 once a second
 winter is in the data. Gate 1 condition (2) is met by ridge, not by boosting; the gate asked for a
 model that beats the best baseline on walk-forward MAE, and this one does.
+
+
+
+## 2026-11-07 — Gate 1 evidence (final check on 15 Nov)
+`sql/10_gate1_evidence.sql`: first unattended run 2026-10-26 09:00 UTC; 11.9 days running; 47 live
+runs, 0 failed; longest gap between successful runs 11 h 00 m (limit 12 h); mean gap 6.1 h (GitHub
+delivers ~4 of 24 hourly slots). Condition (2): ridge 8.66 vs persistence 9.36 on six walk-forward
+folds (docs/experiments.md). Both conditions hold; the 14-day mark falls on 9 Nov.
