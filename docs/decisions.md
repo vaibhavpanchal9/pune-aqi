@@ -133,3 +133,15 @@ model that beats the best baseline on walk-forward MAE, and this one does.
 runs, 0 failed; longest gap between successful runs 11 h 00 m (limit 12 h); mean gap 6.1 h (GitHub
 delivers ~4 of 24 hourly slots). Condition (2): ridge 8.66 vs persistence 9.36 on six walk-forward
 folds (docs/experiments.md). Both conditions hold; the 14-day mark falls on 9 Nov.
+
+
+
+## 2026-11-07 — the v1 band is residual-ratio quantiles, 80% nominal
+
+Three methods on six folds (`results/intervals.csv`, `python intervals.py`). Residual quantiles average
+0.806 but swing from 0.60 to 0.97 across folds: errors measured on the previous season do not fit the
+next one. Quantile regression is overconfident in five of six folds (0.73). Residual-ratio quantiles —
+relative errors, so the band scales with the forecast — cover 0.82 on average, never below 0.73 in any
+fold, and 52% of the Poor-or-worse hours (vs 37% and 33%). Width 36 µg/m³: honest, not pretty.
+In production the calibration window is always the most recent 8 weeks before retraining, which is
+the best any static band can do; v2 candidates are a rolling re-calibration and quantile boosting.
