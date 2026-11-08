@@ -56,3 +56,23 @@ Databases → Reset password; OpenAQ: account page), then update the three place
   The 72-hour lookback refetches the gap automatically when it comes back.
 - CPCB hours are IST hours, stored as UTC :30. Convert only for display.
 - Zeros and long flat runs are stuck instruments, not air (docs/data_quality.md).
+## Hourly trigger (added 8 Nov 2026)
+
+GitHub's own `schedule:` cron is best-effort: between 26 Oct and 7 Nov it delivered 47 runs
+in 12 days, about 4 per day (sql/10_gate1_evidence.sql). Since 8 Nov the hourly run is
+dispatched from outside GitHub:
+
+- cron-job.org job "pune-aqi ingest": every hour at :00 UTC, POST to
+  https://api.github.com/repos/vaibhavpanchal9/pune-aqi/actions/workflows/ingest.yml/dispatches
+  with body {"ref":"main"}.
+- Auth: fine-grained personal access token "cron-job dispatch" -- this repo only, Actions
+  read/write only (GitHub confirmed `x-accepted-github-permissions: actions=write` on the test
+  call). Expires 8 Nov 2027 IST. The token lives only inside cron-job.org: not in .env, not in
+  Actions secrets, not in this repo.
+- The GitHub cron `23 * * * *` stays in ingest.yml as a fallback. Two runs in the same hour
+  are harmless: inserts are ON CONFLICT DO NOTHING.
+- If runs stop: cron-job.org -> job history shows the HTTP status of each call.
+  401 = token expired or revoked (regenerate on GitHub, paste into the job's Authorization
+  header). 404 = token lost Actions write, or the workflow file was renamed.
+- The header X-GitHub-Api-Version: 2022-11-28 is marked deprecated by GitHub with a sunset
+  of 10 Mar 2028. Before then, change it to a newer version.
