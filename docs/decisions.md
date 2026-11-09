@@ -145,3 +145,33 @@ relative errors, so the band scales with the forecast — cover 0.82 on average,
 fold, and 52% of the Poor-or-worse hours (vs 37% and 33%). Width 36 µg/m³: honest, not pretty.
 In production the calibration window is always the most recent 8 weeks before retraining, which is
 the best any static band can do; v2 candidates are a rolling re-calibration and quantile boosting.
+## 2026-11-09 — v1 goes live: ridge + residual-ratio band as JSON, one forecast per hour, never overwritten
+
+**Decision 1 — the product model is a JSON file, not a pickle.** `fit_model.py` refits the Step 8 ridge on
+every usable row (10,186 rows, 25 Feb 2025 -> 7 Nov 2026 17:30 UTC) and calibrates the Step 9 residual-ratio
+band on the last 8 weeks (789 usable rows: lo_q -0.275, hi_q +0.401), then writes `models/v1.json`: 21 feature
+names, 21 means, 21 scales, 21 coefficients, one intercept, the two quantiles, and where each number came from
+(rows, dates, library versions, git commit, and the walk-forward MAEs read from results/model_comparison.csv:
+8.657 vs persistence 9.357). `forecast.py` applies it with numpy alone.
+*Why:* readable and diffable in git; serving needs no scikit-learn; a pickle ties the service to one library
+version and runs code on load. `tests/test_forecast.py` proves the JSON reproduces scikit-learn to 1e-8 and
+that `forecast.predict` equals `intervals.residual_band(ratio=True)` on unseen rows: the service serves
+exactly what was evaluated.
+
+**Decision 2 — one horizon, first forecast stands.** Every hour, after ingest, `forecast.py` issues a forecast
+for each origin hour of the last 24 h that has a complete feature row and whose target hour is still ahead.
+A row in `forecasts` is written once (`ON CONFLICT DO NOTHING`); point and band are clipped at 0.
+*Why one horizon:* 24 h ahead is what was evaluated; 24 separate models would be 23 unevaluated ones (a v2
+candidate). *Why never overwrite:* a forecast that stands is what a user would have been told, so
+forecast-vs-actual (sql/11_forecasts.sql, Q43) is a true live score. *Why clipping is free:* it can only move
+a number towards the actual, so the walk-forward MAE and the coverage still hold.
+
+**Known limits, measured rather than hidden.**
+1. Readings arrive late (the primary station was 11.3 h behind at the first run), so the newest forecast
+   reaches 24 h minus the lag: 12.7 h on 9 Nov. Q42 tracks issue delay and lead time.
+2. No forecast is issued when any feature is missing: a gap longer than 3 h removes rows at every lag offset
+   after it. Q44 tracks availability. A fallback model on fewer lags is a v2 candidate.
+3. The spike/dropout rule needs the next reading, so it cannot be applied to the newest hour at issue time:
+   a spike there is forecast from, and only later removed from training data.
+4. The first 13 forecasts were issued at 10:17 IST on 9 Nov and straddle Diwali night (8 Nov): the 23:00 IST
+   forecast of 138 µg/m³ carries the festival reading forward. Q43 scores it on 10 Nov.

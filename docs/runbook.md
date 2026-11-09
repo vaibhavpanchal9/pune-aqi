@@ -76,3 +76,18 @@ dispatched from outside GitHub:
   header). 404 = token lost Actions write, or the workflow file was renamed.
 - The header X-GitHub-Api-Version: 2022-11-28 is marked deprecated by GitHub with a sunset
   of 10 Mar 2028. Before then, change it to a newer version.
+
+## The forecast step (added 9 Nov 2026)
+
+After `ingest.py`, the workflow runs `python forecast.py`: it loads `models/v1.json` and the last 14 days
+of readings for sensor 12238693, builds the same features as training (dataset.py), and inserts a forecast
+for every origin hour of the last 24 h that is complete and not yet on file. The step prints how many rows
+it wrote and the newest forecast; "0 new rows" is normal when no new reading has arrived.
+`python forecast.py --dry-run` shows what it would write without writing. The forecast and healthcheck
+steps run even if ingest failed.
+
+Evidence: `python runsql.py sql/11_forecasts.sql` -- Q41 what is on file, Q42 lead time, Q43 live MAE,
+coverage and persistence on the same hours, Q44 availability.
+
+Refit (a new version): `python dataset.py && python fit_model.py --version v2`, commit `models/v2.json`,
+change `DEFAULT_MODEL` in forecast.py (or pass `--model`). Old rows keep their `model_version`.
