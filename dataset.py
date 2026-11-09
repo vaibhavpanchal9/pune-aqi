@@ -34,12 +34,17 @@ HORIZON = 24                 # hours ahead
 
 
 # ----------------------------------------------------------------------------- loading
-def load_readings(sensor_id):
-    """Raw readings for one sensor as a Series indexed by UTC hour, sorted."""
+def load_readings(sensor_id, since=None):
+    """Raw readings for one sensor as a Series indexed by UTC hour, sorted.
+
+    `since` (a UTC timestamp) loads only readings from that moment on -- forecast.py needs the last
+    two weeks, not twenty months. Training always loads everything.
+    """
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute("SELECT measured_at, value FROM measurements "
-                    "WHERE sensor_id = %(sid)s AND source = 'openaq' ORDER BY measured_at",
-                    {"sid": sensor_id})
+                    "WHERE sensor_id = %(sid)s AND source = 'openaq' "
+                    "AND (%(since)s IS NULL OR measured_at >= %(since)s) ORDER BY measured_at",
+                    {"sid": sensor_id, "since": since})
         rows = cur.fetchall()
     ts = pd.to_datetime([r[0] for r in rows], utc=True)
     s = pd.Series([float(r[1]) for r in rows], index=pd.DatetimeIndex(ts), name="value")

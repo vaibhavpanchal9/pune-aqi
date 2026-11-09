@@ -135,3 +135,20 @@ SELECT sensor_id,
        LEAD(value, 24) OVER w AS y_24h_ahead
 FROM joined
 WINDOW w AS (PARTITION BY sensor_id ORDER BY ts);
+-- Step 10: one row per issued forecast, written by forecast.py after every ingest run.
+-- The first forecast for a (sensor, target hour, model) stands: forecast.py inserts with
+-- ON CONFLICT DO NOTHING. The table is a log of what was said and when; the actual for the
+-- same hour arrives a day later in measurements, and the join of the two is the live accuracy.
+CREATE TABLE IF NOT EXISTS forecasts (
+    sensor_id      BIGINT            NOT NULL,
+    origin_time    TIMESTAMPTZ       NOT NULL,   -- the newest hour whose features were used
+    target_time    TIMESTAMPTZ       NOT NULL,   -- origin_time + horizon_hours: the hour being forecast
+    horizon_hours  INTEGER           NOT NULL,
+    point          DOUBLE PRECISION  NOT NULL,
+    lower          DOUBLE PRECISION  NOT NULL,   -- 80% band
+    upper          DOUBLE PRECISION  NOT NULL,
+    model_version  TEXT              NOT NULL,   -- models/<version>.json
+    issued_at      TIMESTAMPTZ       NOT NULL DEFAULT now(),
+    PRIMARY KEY (sensor_id, target_time, model_version)
+);
+CREATE INDEX IF NOT EXISTS idx_forecasts_issued ON forecasts (issued_at);

@@ -2,8 +2,8 @@ name: ingest
 
 on:
   schedule:
-    - cron: "23 * * * *"       # hourly at :23 UTC; GitHub delivers roughly a third of the slots
-  workflow_dispatch:           # adds a "Run workflow" button for manual runs
+    - cron: "23 * * * *"       # best-effort fallback; the hourly trigger is cron-job.org (docs/runbook.md)
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,7 +23,16 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-ingest.txt
       - run: pip install -r requirements-ingest.txt
-      - name: ingest last 72 h
+
+      - name: ingest the last 72 hours
         run: python ingest.py --hours-back 72
-      - name: healthcheck (fails the job if data is stale)
+
+      # the two steps below run even if ingest failed: forecasts can still be issued from the
+      # readings already in the database, and the log should always end with the health verdict
+      - name: issue forecasts
+        if: ${{ !cancelled() }}
+        run: python forecast.py
+
+      - name: healthcheck
+        if: ${{ !cancelled() }}
         run: python healthcheck.py
