@@ -38,24 +38,28 @@
 - `.gitignore` had `models/` in it, which would have hidden the model file (caught on 9 Nov).
 - Week-02 notes written on 10 Nov, not Sunday.
 
-## What I couldn't explain yet (rewrite in my own words)
+## What I couldn't explain yet (draft - rewrite in my own words)
 
-1. **Why ridge beat boosting.** Boosting predicts by averaging the training rows that look most like the
-   current one; it can never output a value outside the range it was trained on. Winter 2025 levels were
-   higher than anything before them, so every tree answered with the highest value it knew. Ridge
-   multiplies the lags by fixed weights, so a higher input simply gives a higher output.
+1. **Why ridge beat boosting.** Boosting is many small decision trees. A tree answers with the average
+   of the training rows that look like the current one, so it can never give a number higher than what
+   it saw in training. For fold 1 the training data (Feb-Nov 2025) sat between 15 and 60; the winter
+   then went to around 100. Boosting kept answering "about 60" and scored 24.8. Ridge is a weighted
+   sum of the lags: a bigger input gives a bigger output, with no ceiling. It scored 15.0 in that fold.
+   Teaching boosting to predict the 24 h change instead of the level helped (20.2) but not enough.
+   Over all six folds ridge is 8.66 against 9.36 for persistence.
 
-2. **Why the fold-6 band covered only 60%.** The fixed-width band is measured on the 8 weeks before
-   the fold. For fold 6 those weeks were mid-July to mid-September: monsoon, the cleanest air of the year,
-   small errors, so the narrowest band of all six folds (13.9 µg/m³ against 28-46 in folds 1-4). The fold
-   itself ran mid-September to early November, when levels and errors climb. A band sized in monsoon,
-   applied after it. Fold 1 is the same story a year earlier (coverage 0.65): calibrated in October,
-   tested in the winter peak. Both failures are "season turning upward" folds; a fixed width cannot
-   follow that, the ratio band widens with the forecast, so it does. (Checked in results/intervals.csv.)
+2. **Why the fold-6 band covered only 60%.** The fixed-width band takes its width from the model's
+   errors in the 8 weeks before the fold. Before fold 6 those weeks were monsoon: clean air, small
+   errors, so the narrowest band of all six folds (13.9 against 28-46 in folds 1-4). Fold 6 itself was
+   mid-September to early November, when pollution and errors rise. The band was too narrow for that,
+   so only 60% of actual values fell inside. Fold 1 failed the same way a year earlier (0.65). The ratio
+   band gets wider when the forecast is higher, so it follows the season: worst fold 0.73, mean 0.82.
+   (Checked in results/intervals.csv.)
 
-3. **What the 24 h gap in the splits prevents.** The target of the last training row is the value 24 h
-   later. Without the gap, that value lies inside the test window: the model has seen a test answer during
-   training. The gap pushes the training window back far enough that no training target falls in test.
+3. **What the 24 h gap in the splits prevents.** Every training row's answer is the reading 24 hours
+   later. If training ended exactly where the test window starts, the answers of the last 24 training
+   rows would be readings from inside the test window, so the model would have seen part of the exam.
+   Stopping training 24 hours before the test starts means no training answer comes from the test period.
 
 ## Carried into week 3
 
