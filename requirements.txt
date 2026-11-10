@@ -4,3 +4,7 @@ psycopg2-binary==2.9.12
 pandas==3.0.3
 pytest==8.3.4
 scikit-learn==1.9.1
+
+fastapi==0.162.2
+httpx==0.28.1
+uvicorn==0.54.0

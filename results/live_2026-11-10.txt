@@ -1,0 +1,23 @@
+>> Q41: the forecasts currently on file for hours still ahead (what the API will serve)
+target_ist  point  lower  upper  hours_ahead  issued_ist  model_version
+----------  -----  -----  -----  -----------  ----------  -------------
+(0 rows)
+
+>> Q42: lead time. issued - origin = how late the data was + the hourly cadence; target - iss
+forecasts  mean_issue_delay_h  max_issue_delay_h  mean_lead_h  min_lead_h
+---------  ------------------  -----------------  -----------  ----------
+13         17.3                23.3               6.7          0.7       
+(1 rows)
+
+>> persistence_mae = the same hours forecast by "same as the origin hour", for comparison.
+scored  mae    bias    coverage_80  mean_width  persistence_mae  first_scored               last_scored              
+------  -----  ------  -----------  ----------  ---------------  -------------------------  -------------------------
+13      33.23  -24.57  0.615        40.8        46.32            2026-11-09 05:30:00+00:00  2026-11-09 17:30:00+00:00
+(1 rows)
+
+>> (none when a feature was missing at issue time: a gap longer than 3 h removes rows at ever
+hours_with_forecast  hours_in_week  availability
+-------------------  -------------  ------------
+13                   168            0.077       
+(1 rows)
+
