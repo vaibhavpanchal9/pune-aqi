@@ -175,3 +175,21 @@ a number towards the actual, so the walk-forward MAE and the coverage still hold
    a spike there is forecast from, and only later removed from training data.
 4. The first 13 forecasts were issued at 10:17 IST on 9 Nov and straddle Diwali night (8 Nov): the 23:00 IST
    forecast of 138 µg/m³ carries the festival reading forward. Q43 scores it on 10 Nov.
+
+## 2026-11-10 — the API: three read-only endpoints, served sensor and model read from the model file
+
+`app.py` (FastAPI, Pydantic models, /docs generated) over `service.py` (one function per endpoint,
+one connection per request). `/health` reuses healthcheck.py's thresholds by importing them; `/forecast`
+returns 200 with an empty list when nothing is on file, 404 for a sensor without a model, 422 for a
+non-integer id; `/stats` puts the live record (as issued, never revised) next to the walk-forward figure.
+The served sensor, version, horizon and band come from models/v1.json so the API cannot drift from
+forecast.py. Tested at the HTTP layer with fakes (tests/test_api.py); the SQL is checked by
+`python service.py` against Neon.
+
+**First live day (results/live_2026-11-10.txt).** 13 hours scored, all on 9 Nov, the day after Diwali:
+MAE 33.2, bias -24.6 (under-forecast), coverage 0.615, persistence MAE 46.3. Not a verdict; a record.
+
+**Availability failure, day one.** After the Diwali-night gap the station came back, but for 24 h no
+origin row had every lag present: 21 hours in the window, 0 complete, 0 forecasts issued. Fix planned
+for 11 Nov: fallback tiers of the same ridge recipe on shorter lag sets, each evaluated on the same
+six folds, used when the full row is incomplete.
