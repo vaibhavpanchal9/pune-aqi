@@ -45,10 +45,13 @@
    higher than anything before them, so every tree answered with the highest value it knew. Ridge
    multiplies the lags by fixed weights, so a higher input simply gives a higher output.
 
-2. **Why the fold-6 band covered only 60%.** The residual-quantile band has a fixed width in µg/m³,
-   measured on the 8 weeks before the fold. Fold 6 was a quieter period than its calibration weeks, so the
-   width was right for the wrong level: too wide where it did not matter and, at the hours that jumped,
-   still too narrow. The ratio band scales with the forecast, which is why its folds vary less.
+2. **Why the fold-6 band covered only 60%.** The fixed-width band is measured on the 8 weeks before
+   the fold. For fold 6 those weeks were mid-July to mid-September: monsoon, the cleanest air of the year,
+   small errors, so the narrowest band of all six folds (13.9 µg/m³ against 28-46 in folds 1-4). The fold
+   itself ran mid-September to early November, when levels and errors climb. A band sized in monsoon,
+   applied after it. Fold 1 is the same story a year earlier (coverage 0.65): calibrated in October,
+   tested in the winter peak. Both failures are "season turning upward" folds; a fixed width cannot
+   follow that, the ratio band widens with the forecast, so it does. (Checked in results/intervals.csv.)
 
 3. **What the 24 h gap in the splits prevents.** The target of the last training row is the value 24 h
    later. Without the gap, that value lies inside the test window: the model has seen a test answer during
