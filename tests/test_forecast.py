@@ -82,20 +82,23 @@ def test_only_recent_complete_future_origins_are_issued():
     # a 5-hour hole (12:30-16:30 the day before): longer than the gap policy fills, so it stays missing
     s = readings_until(now, hole=range(24 * 20 - 16, 24 * 20 - 11))
     f = feature_rows(s)
-    rows, counts = issuable(f, now, horizon=24)
+    one_tier = [{"name": "full", "features": feature_columns(f)}]          # the v1 situation: no fallback
+    rows, chosen, counts = issuable(f, now, horizon=24, tiers=one_tier)
     assert counts["in_window"] == 22                      # 06:30 yesterday .. 03:30 today, the newest reading
     assert rows.index.min() > now - pd.Timedelta(hours=24)
     assert (rows.index + pd.Timedelta(hours=24) > now).all()
     assert not rows[feature_columns(f)].isna().any().any()
-    # the hours right after the hole have a missing lag_1 / lag_2 ...: fewer complete rows than in the window
-    assert counts["complete"] < counts["in_window"]
-    assert counts["future_target"] == counts["complete"]  # every origin in the last 24 h targets the future
+    assert (chosen == "full").all() and len(chosen) == len(rows)
+    # the hours after the hole have a missing lag: with one tier, fewer rows are issued than are in the window
+    assert counts["full"] == len(rows) < counts["in_window"]
+    assert counts["full"] + counts["none"] == counts["in_window"]
 
 
 def test_nothing_is_issued_when_the_data_is_too_old():
     now = pd.Timestamp("2026-11-09 06:10", tz="UTC")
     s = readings_until(now - pd.Timedelta(hours=30))       # newest reading 33 h old
-    rows, counts = issuable(feature_rows(s), now, horizon=24)
+    f = feature_rows(s)
+    rows, _, counts = issuable(f, now, horizon=24, tiers=[{"name": "full", "features": feature_columns(f)}])
     assert rows.empty and counts["in_window"] == 0
 
 
@@ -105,7 +108,7 @@ def test_forecast_table_has_the_table_shape():
     spec, _ = build_spec(f_train, feature_columns(f_train), version="vtest", sensor_id=42)
     table, counts = forecast_table(spec, feature_rows(readings_until(now)), now)
     assert list(table.columns) == COLUMNS
-    assert len(table) == counts["future_target"] > 0
+    assert len(table) == counts["full"] > 0 and (table["tier"] == "full").all()   # a v1 spec is one tier
     assert (table["target_time"] - table["origin_time"] == pd.Timedelta(hours=24)).all()
     assert (table["sensor_id"] == 42).all() and (table["model_version"] == "vtest").all()
     assert (table["lower"] <= table["point"]).all() and (table["point"] <= table["upper"]).all()

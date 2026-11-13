@@ -91,3 +91,20 @@ coverage and persistence on the same hours, Q44 availability.
 
 Refit (a new version): `python dataset.py && python fit_model.py --version v2`, commit `models/v2.json`,
 change `DEFAULT_MODEL` in forecast.py (or pass `--model`). Old rows keep their `model_version`.
+
+## Model versions and tiers (added 13 Nov 2026)
+
+The hourly job reads the model named in modelfile.py (DEFAULT_MODEL, now models/v2.json). This replaces
+the older note about DEFAULT_MODEL in forecast.py. v2 has three tiers (full > day > short); the log line
+"origin hours: N in the last 24 h -> full a, day b, short c, no tier d" says which tier served how many
+hours. "no tier" hours are the first 3 after a gap, or hours with no reading.
+
+A new version: `python dataset.py && python tiers.py && python fit_model.py --version v3`, then change
+DEFAULT_MODEL in modelfile.py and commit both. fit_model.py refuses to overwrite an existing model file:
+a version name means one model forever, because rows in `forecasts` refer to it.
+
+## If the laptop cannot reach the database (13 Nov 2026)
+
+`could not translate host name ... neon.tech` is the laptop's DNS, not Neon and not the pipeline (the
+cloud job kept running). Check: `nslookup <host> 8.8.8.8` answers while plain `nslookup <host>` says
+REFUSED. Fix: `sudo networksetup -setdnsservers Wi-Fi 1.1.1.1 8.8.8.8` (undo with `... Wi-Fi empty`).

@@ -152,3 +152,7 @@ CREATE TABLE IF NOT EXISTS forecasts (
     PRIMARY KEY (sensor_id, target_time, model_version)
 );
 CREATE INDEX IF NOT EXISTS idx_forecasts_issued ON forecasts (issued_at);
+
+-- Step 10b: which tier of the model made each forecast (full / day / short). The rows written by v1
+-- were all made by the full model, so 'full' is the true value for them and the default.
+ALTER TABLE forecasts ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'full';

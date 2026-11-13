@@ -59,3 +59,15 @@ def test_defaults_cover_48_weeks_in_six_folds():
     assert (d["test_rows"] == 24 * 7 * 8).all()
     assert d["test_to"].iloc[-1] - d["test_from"].iloc[0] >= pd.Timedelta("48W") - pd.Timedelta("1h")
     assert (d["gap_hours"] >= 24).all()
+
+
+def test_an_explicit_end_cuts_other_rows_into_the_same_windows():
+    """tiers.py: a model with MORE usable rows must be tested on the same eight-week spans in time."""
+    base = hourly_index(24 * 700, drop_every=7)                       # the full model's rows
+    more = hourly_index(24 * 700 + 30)                                # a superset that also runs 30 h later
+    same = walk_forward(more, end=base.max())
+    for (_, te_base), (tr_more, te_more) in zip(walk_forward(base), same):
+        assert te_more.min() > te_base.min() - pd.Timedelta("8h") and te_more.max() == te_base.max()
+        assert len(te_more) > len(te_base)                            # same span, more rows in it
+        assert tr_more.max() <= te_more.min() - pd.Timedelta("24h")   # the gap still holds
+    assert same[-1][1].max() == base.max()                            # nothing after `end` is tested

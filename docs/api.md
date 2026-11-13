@@ -84,3 +84,13 @@ quote until a few hundred hours have been scored.
   request after a quiet spell can take about a second. A pool is a v2 item.
 - Inputs and outputs are validated by Pydantic models; `/openapi.json` is generated from them.
 - No writes, no authentication: everything served is already public data or derived from it.
+
+## Changes with model v2 (13 Nov 2026)
+
+- `/forecast`: every row has a `tier` field: `full`, `day` or `short`, the tier of the model that made it.
+  The band is that tier's own 80% band.
+- `/stats`: `live_by_tier` (the live record split by tier), `live_by_version` (v1's record stays visible
+  next to v2's), `tiers` (each tier's features, the history it needs, and its out-of-sample figures), and
+  `walk_forward` is now the cascade's figure from results/tier_comparison.csv: MAE 8.59 against 9.36 for
+  persistence on 6,822 hours.
+- The served model is the one named in modelfile.py, not a fixed v1 file.

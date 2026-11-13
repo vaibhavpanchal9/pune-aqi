@@ -6,10 +6,11 @@
     GET /            what is here
     GET /health      is the pipeline alive: newest reading, last run, forecasts on file. Always 200;
                      the "status" field says ok / upstream_lag / broken, same rules as healthcheck.py
-    GET /forecast    the forecasts on file for the hours ahead, with the 80% band
+    GET /forecast    the forecasts on file for the hours ahead, with the 80% band and the tier
+                     of the model that made each one (full / day / short)
                      404 for a sensor without a model, 422 for a sensor_id that is not a number
-    GET /stats       live accuracy so far (as issued, never revised) next to the walk-forward figure
-                     the model was chosen on, plus lead time and availability
+    GET /stats       live accuracy so far (as issued, never revised) overall, per tier and per model
+                     version, next to the walk-forward figures, plus lead time and availability
 
 FastAPI validates the inputs and the outputs against the Pydantic models below, and writes the
 interactive documentation at /docs from them. service.py does the database work.
@@ -46,6 +47,7 @@ class ForecastRow(BaseModel):
     lower: float = Field(description="10th percentile")
     upper: float = Field(description="90th percentile")
     issued_at: datetime
+    tier: str = Field(description="which tier of the model made it: full, day or short (fewer lags)")
 
 
 class ForecastResponse(BaseModel):
@@ -71,8 +73,11 @@ class StatsResponse(BaseModel):
     sensor_id: int
     model_version: str
     live: dict
+    live_by_tier: list[dict]
+    live_by_version: list[dict]
     lead_time: dict
     availability_7d: dict
+    tiers: list[dict]
     walk_forward: Optional[dict]
     trained_on: dict
 

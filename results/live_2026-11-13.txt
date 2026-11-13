@@ -1,0 +1,54 @@
+>> Q41: the forecasts on file for hours still ahead, newest model version (what the API serve
+target_ist        point  lower  upper  hours_ahead  tier  issued_ist    model_version
+----------------  -----  -----  -----  -----------  ----  ------------  -------------
+Fri 13 Nov 09:00  61.2   45.7   86.6   0.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 10:00  57.9   43.3   81.9   1.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 11:00  60.8   45.5   86.1   2.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 12:00  60.1   44.9   85.1   3.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 13:00  46.1   34.4   65.2   4.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 14:00  47.9   35.8   67.8   5.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 15:00  41.6   31.1   58.9   6.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 16:00  35.3   26.4   50.0   7.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 17:00  39.5   29.5   55.9   8.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 18:00  41.9   31.3   59.3   9.6          full  13 Nov 08:17  v2           
+Fri 13 Nov 19:00  46.1   34.5   65.3   10.6         full  13 Nov 08:17  v2           
+Fri 13 Nov 20:00  48.8   36.5   69.1   11.6         full  13 Nov 08:17  v2           
+Fri 13 Nov 21:00  50.8   37.9   71.9   12.6         full  13 Nov 08:17  v2           
+Fri 13 Nov 22:00  62.4   46.6   88.3   13.6         full  13 Nov 08:17  v2           
+Fri 13 Nov 23:00  70.4   52.6   99.7   14.6         full  13 Nov 08:17  v2           
+Sat 14 Nov 00:00  73.4   54.9   104.0  15.6         full  13 Nov 08:17  v2           
+Sat 14 Nov 01:00  73.0   54.6   103.4  16.6         full  13 Nov 08:17  v2           
+Sat 14 Nov 02:00  67.7   50.6   95.8   17.6         full  13 Nov 08:17  v2           
+Sat 14 Nov 03:00  64.1   47.9   90.7   18.6         full  13 Nov 08:17  v2           
+Sat 14 Nov 04:00  62.3   46.6   88.2   19.6         full  13 Nov 08:17  v2           
+Sat 14 Nov 05:00  56.4   42.2   79.9   20.6         full  13 Nov 08:17  v2           
+(21 rows)
+
+>> Q42: lead time per model version. issued - origin = how late the data was; target - issued
+model_version  forecasts  mean_issue_delay_h  max_issue_delay_h  mean_lead_h  min_lead_h
+-------------  ---------  ------------------  -----------------  -----------  ----------
+v1             61         5.8                 23.3               18.2         0.7       
+v2             21         13.3                23.3               10.7         0.7       
+(2 rows)
+
+>> persistence_mae = the same hours forecast by "same as the origin hour", for comparison.
+model_version  tier  scored  mae    bias   coverage_80  mean_width  persistence_mae  first_ist     last_ist    
+-------------  ----  ------  -----  -----  -----------  ----------  ---------------  ------------  ------------
+v1             full  37      18.75  -3.98  0.757        44.6        25.48            09 Nov 11:00  13 Nov 05:00
+(1 rows)
+
+>> Q44: availability. Of the last 7 days' hours that have passed, how many had a forecast on 
+hours_with_forecast  hours_in_week  availability
+-------------------  -------------  ------------
+40                   168            0.238       
+(1 rows)
+
+>> Q45: availability day by day (IST): hours with a forecast, and which tier made them
+day_ist     hours_with_forecast  full_tier  day_tier  short_tier
+----------  -------------------  ---------  --------  ----------
+Mon 09 Nov  13                   13         0         0         
+Wed 11 Nov  3                    3          0         0         
+Thu 12 Nov  15                   15         0         0         
+Fri 13 Nov  9                    9          0         0         
+(4 rows)
+

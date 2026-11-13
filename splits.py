@@ -29,7 +29,7 @@ The function works on timestamps, not row positions, so missing hours on the gri
 import pandas as pd
 
 
-def walk_forward(index, n_folds=6, test_weeks=8, gap_hours=24, min_train_days=180):
+def walk_forward(index, n_folds=6, test_weeks=8, gap_hours=24, min_train_days=180, end=None):
     """Return a list of (train_index, test_index) DatetimeIndex pairs, oldest fold first.
 
     index           the DatetimeIndex of the rows available (usually the usable rows' index)
@@ -37,11 +37,14 @@ def walk_forward(index, n_folds=6, test_weeks=8, gap_hours=24, min_train_days=18
     test_weeks      length of each test window
     gap_hours       hours between the last training timestamp and the first test timestamp
     min_train_days  the oldest fold must still have at least this much training history, else ValueError
+    end             where the newest window ends. Default: the newest timestamp in `index`. Pass the
+                    same `end` to cut a DIFFERENT set of rows into the SAME windows in time (tiers.py
+                    does this, so a model with more usable rows is tested on the same eight-week spans).
     """
     idx = pd.DatetimeIndex(index).sort_values()
     if idx.has_duplicates:
         raise ValueError("index has duplicate timestamps")
-    end = idx.max()
+    end = idx.max() if end is None else end
     folds = []
     for k in range(n_folds):                      # k = 0 is the newest window
         test_end = end - pd.DateOffset(weeks=test_weeks * k)

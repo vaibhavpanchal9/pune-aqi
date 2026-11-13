@@ -20,7 +20,8 @@ NOW = datetime.now(timezone.utc)
 
 def fake_forecast(sensor_id=service.SENSOR):
     rows = [{"target_time": NOW + timedelta(hours=h), "point": 40.0 + h, "lower": 30.0 + h,
-             "upper": 55.0 + h, "issued_at": NOW - timedelta(hours=2)} for h in (3, 1, 2)]   # unsorted on purpose
+             "upper": 55.0 + h, "issued_at": NOW - timedelta(hours=2),
+             "tier": "short" if h == 1 else "full"} for h in (3, 1, 2)]                        # unsorted on purpose
     return {"sensor_id": sensor_id, "station": "Test station", "model_version": "v1", "horizon_hours": 24,
             "band": "80% interval (residual_ratio)", "data_as_of": NOW - timedelta(hours=22), "forecasts": rows}
 
@@ -37,10 +38,16 @@ def fake_stats(sensor_id=service.SENSOR):
     return {"sensor_id": sensor_id, "model_version": "v1",
             "live": {"scored_hours": 10, "mae": 7.5, "bias": -1.2, "coverage_80": 0.8, "mean_width": 30.1,
                      "persistence_mae": 9.9, "first_scored": NOW, "last_scored": NOW, "note": "x"},
+            "live_by_tier": [{"tier": "full", "scored_hours": 8, "mae": 7.0},
+                             {"tier": "short", "scored_hours": 2, "mae": 9.5}],
+            "live_by_version": [{"model_version": "v1", "scored_hours": 13, "mae": 33.23},
+                                {"model_version": "v2", "scored_hours": 10, "mae": 7.5}],
             "lead_time": {"forecasts_issued": 13, "mean_issue_delay_hours": 12.0, "mean_lead_hours": 12.0,
                           "min_lead_hours": 0.7},
             "availability_7d": {"hours_with_forecast": 10, "hours": 168, "share": 0.06},
-            "walk_forward": {"ridge_mae": 8.657, "persistence_mae": 9.357, "folds": 6, "source": "x"},
+            "tiers": [{"name": "full", "features": 21, "needs_hours": 168, "walk_forward": {"mae_folds": 8.66}},
+                      {"name": "short", "features": 15, "needs_hours": 3, "walk_forward": {"mae_folds": 9.1}}],
+            "walk_forward": {"mae_served": 8.7, "persistence_served": 9.4, "n_served": 7000, "source": "x"},
             "trained_on": {"rows": 10186, "from": "2025-02-25", "through": "2026-11-07"}}
 
 
@@ -76,6 +83,7 @@ def test_forecast_default_sensor_is_200_with_rows_and_lead_hours(client):
     for row in body["forecasts"]:
         assert row["lower"] <= row["point"] <= row["upper"]
         assert row["target_time_ist"].endswith("IST")
+    assert [row["tier"] for row in body["forecasts"]] == ["full", "short", "full"]         # the tier is passed through
     leads = [row["lead_hours"] for row in body["forecasts"]]
     assert all(abs(lead - h) < 0.1 for lead, h in zip(leads, (3, 1, 2)))         # computed from now
 
@@ -102,8 +110,11 @@ def test_stats_shows_live_next_to_walk_forward(client):
     r = client.get("/stats")
     assert r.status_code == 200
     body = r.json()
-    assert body["live"]["mae"] == 7.5 and body["walk_forward"]["ridge_mae"] == 8.657
+    assert body["live"]["mae"] == 7.5 and body["walk_forward"]["mae_served"] == 8.7
     assert body["availability_7d"]["hours"] == 168
+    assert [t["name"] for t in body["tiers"]] == ["full", "short"]
+    assert {v["model_version"] for v in body["live_by_version"]} == {"v1", "v2"}           # the old record stays visible
+    assert sum(t["scored_hours"] for t in body["live_by_tier"]) == body["live"]["scored_hours"]
 
 
 def test_docs_are_generated(client):

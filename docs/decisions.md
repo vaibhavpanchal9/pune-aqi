@@ -193,3 +193,49 @@ MAE 33.2, bias -24.6 (under-forecast), coverage 0.615, persistence MAE 46.3. Not
 origin row had every lag present: 21 hours in the window, 0 complete, 0 forecasts issued. Fix planned
 for 11 Nov: fallback tiers of the same ridge recipe on shorter lag sets, each evaluated on the same
 six folds, used when the full row is incomplete.
+
+## 2026-11-13 — v2: fallback tiers, so a gap costs hours instead of a day
+
+**Problem (measured).** v1 needs every lag back to 168 h. After the Diwali-night gap it issued nothing for
+24 h; on 13 Nov only 40 of the last 168 hours had a forecast (sql/11_forecasts.sql Q44). Over the 48 test
+weeks the full feature row is complete for 73% of hours (80% of the hours the station reported).
+
+**Decision.** Keep the full ridge and add two smaller ones of the same recipe: `day` (no 48/144/168 h
+lags; needs 24 h of history) and `short` (no lag beyond 3 h; needs 3 h). Each hour forecast.py uses the
+richest tier whose features are all present and records it in `forecasts.tier`. Missing lags are never
+invented. Model file models/v2.json; v1 stays in the repository and its rows keep their version.
+
+**The rule, written before the numbers.** A fallback tier ships only if it beats persistence on the hours
+it would actually serve (no richer tier complete), out of sample.
+
+**Evidence (tiers.py, six folds of 8 weeks, pooled; results/tier_comparison.csv, data to 12 Nov).**
+
+| tier | hours served | MAE | persistence, same hours | band coverage there |
+|---|---|---|---|---|
+| full | 5,532 | 8.60 | 9.31 | 0.81 |
+| day | 908 | 7.89 | 9.08 | 0.87 |
+| short | 382 | 10.15 | 10.67 | 0.83 |
+| cascade (v2) | 6,822 | 8.59 | 9.36 | |
+| full only (v1) | 5,532 | 8.60 | 9.31 | |
+
+Both fallbacks pass. `short` passes narrowly (5% better than persistence) and is kept because the
+alternative is no forecast. On the hours all three can do, dropping lags costs little: 8.60 (full),
+8.70 (day), 8.77 (short). The 48/144/168 h lags buy about 1%.
+
+**What it buys (results/tier_availability.csv).** Hours that can be forecast over the 48 test weeks:
+73% -> 86% -> 91% of all hours; 80% -> 93% -> 99% of the hours with a reading. 1,290 more forecast
+hours (+23%) at the same MAE (8.59 vs 8.60).
+
+**A number that moved, and why.** The full tier's mean-of-folds MAE is 8.91 here, not the 8.66 of 3 Nov
+(results/model_comparison.csv). Same model, same recipe: the folds are anchored on the newest data, nine
+more days have arrived, and the last fold now contains Diwali week. Every reported number therefore
+carries its evaluation date. Before the v1.0 write-up the whole comparison is rerun once on a frozen end
+date (splits.walk_forward now takes `end=`).
+
+**v1's live record at the switch (results/live_2026-11-13.txt).** 37 hours scored, MAE 18.75 against
+25.48 for persistence, coverage 0.757, starting with the day after Diwali.
+
+**Mistake of the day, and the guard.** The first attempt ran the old fit_model.py (the new files had not
+been downloaded) and replaced models/v1.json with a refit still named v1. Nothing was issued from it
+(0 new rows) and the file was restored from git. fit_model.py now refuses to overwrite an existing model
+file, with a test. Commands in a list are now chained with && so a failed step stops the rest.
