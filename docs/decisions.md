@@ -239,3 +239,34 @@ date (splits.walk_forward now takes `end=`).
 been downloaded) and replaced models/v1.json with a refit still named v1. Nothing was issued from it
 (0 new rows) and the file was restored from git. fit_model.py now refuses to overwrite an existing model
 file, with a test. Commands in a list are now chained with && so a failed step stops the rest.
+
+## 2026-11-15 — Gate 1: passed
+
+**Condition 1: the cloud job has run unattended for 14+ days with no gap over 12 hours.** Met.
+results/gate1_2026-11-15.txt: first run 26 Oct 09:00 UTC, 19.8 days, 246 runs, 0 failed, longest gap
+11 h 00 m (30 Oct). All ten longest gaps are from before 8 Nov, when GitHub's own schedule was the only
+trigger; since the external timer there are 28 runs a day.
+
+**Condition 2: a model beats the best baseline on the walk-forward test.** Met. Ridge 8.66 vs
+persistence 9.36 µg/m³, mean of six folds, data to 3 Nov (results/model_comparison.csv); v2 cascade
+8.59 vs 9.36, pooled over six folds, data to 12 Nov (results/tier_comparison.csv).
+
+**What the gate does not say (results/live_2026-11-15.txt).** The live record is running well behind
+the test record:
+
+| | scored hours | MAE | persistence, same hours | coverage of the 80% band |
+|---|---|---|---|---|
+| v1, 9-14 Nov | 61 | 19.2 | 22.5 | 0.69 |
+| v2, 13-15 Nov | 48 | 22.4 | 23.4 | 0.50 |
+
+Both still beat persistence, v2 only just. These are the days after Diwali with levels around 60-100,
+the range where error analysis found the model weakest, and the forecasts run 8-10 µg/m³ low: the season
+is rising and the band was calibrated on calmer weeks (the fold-1 / fold-6 failure, in milder form).
+48 consecutive hours are about two days of independent evidence, so no change is made on this.
+**Checkpoint: 29 Nov (Gate 2), with about 300 scored hours.** If live coverage is still under 0.70 the
+band calibration is revisited before the write-up; the write-up reports live next to walk-forward
+either way.
+
+**The tiers, two days after shipping.** Since v2 (13 Nov) every hour has had a forecast (24/24, 24/24,
+11/11 so far today; Tue 10 Nov had none). From Sunday 00:00 IST the `day` tier is serving: the 144-hour
+lag has reached the Diwali-night gap, the "again six days later" hole in which v1 would have gone silent.

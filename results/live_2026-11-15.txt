@@ -1,0 +1,58 @@
+>> Q41: the forecasts on file for hours still ahead, newest model version (what the API serve
+target_ist        point  lower  upper  hours_ahead  tier  issued_ist    model_version
+----------------  -----  -----  -----  -----------  ----  ------------  -------------
+Sun 15 Nov 12:00  84.1   62.8   119.0  0.2          full  14 Nov 14:31  v2           
+Sun 15 Nov 13:00  67.1   50.2   95.0   1.2          full  14 Nov 15:31  v2           
+Sun 15 Nov 14:00  60.5   45.2   85.6   2.2          full  14 Nov 16:31  v2           
+Sun 15 Nov 15:00  51.1   38.2   72.3   3.2          full  14 Nov 17:31  v2           
+Sun 15 Nov 16:00  48.9   36.5   69.2   4.2          full  14 Nov 18:31  v2           
+Sun 15 Nov 17:00  47.1   35.2   66.7   5.2          full  14 Nov 19:31  v2           
+Sun 15 Nov 18:00  46.2   34.5   65.4   6.2          full  14 Nov 20:31  v2           
+Sun 15 Nov 19:00  51.2   38.3   72.5   7.2          full  14 Nov 21:31  v2           
+Sun 15 Nov 20:00  54.0   40.4   76.5   8.2          full  14 Nov 22:31  v2           
+Sun 15 Nov 21:00  59.2   44.2   83.8   9.2          full  14 Nov 23:31  v2           
+Sun 15 Nov 22:00  67.1   50.2   95.0   10.2         full  15 Nov 00:31  v2           
+Sun 15 Nov 23:00  81.8   61.1   115.8  11.2         full  15 Nov 01:31  v2           
+Mon 16 Nov 00:00  65.9   48.7   94.6   12.2         day   15 Nov 04:31  v2           
+Mon 16 Nov 01:00  66.4   49.1   95.4   13.2         day   15 Nov 04:31  v2           
+Mon 16 Nov 02:00  60.6   44.8   87.1   14.2         day   15 Nov 04:31  v2           
+Mon 16 Nov 03:00  57.6   42.6   82.7   15.2         day   15 Nov 05:31  v2           
+Mon 16 Nov 04:00  56.6   41.8   81.2   16.2         day   15 Nov 06:31  v2           
+Mon 16 Nov 05:00  61.6   45.5   88.5   17.2         day   15 Nov 08:31  v2           
+Mon 16 Nov 06:00  63.1   46.7   90.6   18.2         day   15 Nov 08:31  v2           
+Mon 16 Nov 07:00  62.3   46.1   89.5   19.2         day   15 Nov 09:31  v2           
+Mon 16 Nov 08:00  62.5   46.2   89.7   20.2         day   15 Nov 10:31  v2           
+Mon 16 Nov 09:00  83.8   62.6   118.6  21.2         full  15 Nov 11:31  v2           
+(22 rows)
+
+>> Q42: lead time per model version. issued - origin = how late the data was; target - issued
+model_version  forecasts  mean_issue_delay_h  max_issue_delay_h  mean_lead_h  min_lead_h
+-------------  ---------  ------------------  -----------------  -----------  ----------
+v1             61         5.8                 23.3               18.2         0.7       
+v2             73         5.7                 23.3               18.3         0.7       
+(2 rows)
+
+>> persistence_mae = the same hours forecast by "same as the origin hour", for comparison.
+model_version  tier  scored  mae    bias    coverage_80  mean_width  persistence_mae  first_ist     last_ist    
+-------------  ----  ------  -----  ------  -----------  ----------  ---------------  ------------  ------------
+v1             full  61      19.16  -10.17  0.689        42.1        22.50            09 Nov 11:00  14 Nov 05:00
+v2             full  49      22.59  -7.43   0.490        42.8        23.82            13 Nov 09:00  15 Nov 09:00
+(2 rows)
+
+>> Q44: availability. Of the last 7 days' hours that have passed, how many had a forecast on 
+hours_with_forecast  hours_in_week  availability
+-------------------  -------------  ------------
+91                   168            0.542       
+(1 rows)
+
+>> Q45: availability day by day (IST): hours with a forecast, and which tier made them
+day_ist     hours_with_forecast  full_tier  day_tier  short_tier
+----------  -------------------  ---------  --------  ----------
+Mon 09 Nov  13                   13         0         0         
+Wed 11 Nov  3                    3          0         0         
+Thu 12 Nov  15                   15         0         0         
+Fri 13 Nov  24                   39         0         0         
+Sat 14 Nov  24                   30         0         0         
+Sun 15 Nov  12                   12         0         0         
+(6 rows)
+
