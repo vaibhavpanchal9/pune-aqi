@@ -1,0 +1,52 @@
+# The API in a container, two ways.
+#
+#   docker compose up --build                     local stack: Postgres (host port 5433) + API (port 8000)
+#   python seed_local.py                          copy a month of data from Neon into the local Postgres
+#   docker compose --profile cloud up api-cloud   the same image talking to Neon instead (port 8001)
+#
+# Ports are bound to 127.0.0.1, so nothing here is reachable from other machines on the network.
+# The local database password below is for this throwaway container only. It is not a secret and
+# must never be reused anywhere real; the Neon credentials stay in .env, which is never committed.
+
+name: pune-aqi
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aqi
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: aqi
+    ports:
+      - "127.0.0.1:5433:5432"          # 5432 on this Mac is taken by the system Postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro    # runs once, on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aqi -d aqi"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build: .
+    image: pune-aqi-api
+    environment:
+      DATABASE_URL: postgresql://aqi:localdev@db:5432/aqi
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api-cloud:
+    build: .
+    image: pune-aqi-api
+    env_file: .env                     # DATABASE_URL for Neon, passed in at start, never baked into the image
+    dns: [1.1.1.1, 8.8.8.8]            # some networks' own DNS refuses the Neon address (docs/runbook.md)
+    ports:
+      - "127.0.0.1:8001:8000"
+    profiles: ["cloud"]
+
+volumes:
+  pgdata:

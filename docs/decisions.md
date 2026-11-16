@@ -270,3 +270,22 @@ either way.
 **The tiers, two days after shipping.** Since v2 (13 Nov) every hour has had a forecast (24/24, 24/24,
 11/11 so far today; Tue 10 Nov had none). From Sunday 00:00 IST the `day` tier is serving: the 144-hour
 lag has reached the Diwali-night gap, the "again six days later" hole in which v1 would have gone silent.
+
+## 2026-11-16 — the API in a container
+
+Dockerfile (three stages: base, test, runtime), docker-compose.yml (a local Postgres on 127.0.0.1:5433
+plus the API; a `cloud` profile for the same image against Neon), seed_local.py (copies a month from Neon
+into the local database and refuses any target that is not on this machine). Commands in docs/docker.md.
+
+Choices: (1) the image holds only the API. No pandas or scikit-learn, because the model is JSON and the
+forecasts are in the table: 250 MB on disk, 55 MB compressed. (2) The tests run inside the build, and the
+runtime stage copies a marker from the test stage: no passing tests, no image. (3) Non-root user; `.env`
+is excluded from the build context; secrets arrive as environment variables at start. (4) The container
+health check asks `/`, not `/health`: a database query every 30 s would keep the free-tier database
+awake. (5) Host ports are bound to 127.0.0.1; the local database password in the compose file is for the
+throwaway container only and is not a secret.
+
+First run: build 20.7 s, 8 passed in 0.36 s inside the container, `/health` "ok" from the cloud profile
+and from the local stack after seeding (19 locations, 215 sensors, 7,169 readings, 298 runs, 160
+forecasts). Live record on the same day, v2 after 75 scored hours: MAE 18.4 vs persistence 19.3,
+coverage 0.57; first 9 hours of the `day` tier: 7.6 vs 4.8. Checkpoint stays 29 Nov.
