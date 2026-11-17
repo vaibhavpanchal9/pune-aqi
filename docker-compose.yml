@@ -42,7 +42,10 @@ services:
   api-cloud:
     build: .
     image: pune-aqi-api
-    env_file: .env                     # DATABASE_URL for Neon, passed in at start, never baked into the image
+    environment:
+      # the READ-ONLY connection string from .env (made by make_readonly_role.py). Passed in at start,
+      # never baked into the image. Empty until that script has been run.
+      DATABASE_URL: ${API_DATABASE_URL:-}
     dns: [1.1.1.1, 8.8.8.8]            # some networks' own DNS refuses the Neon address (docs/runbook.md)
     ports:
       - "127.0.0.1:8001:8000"

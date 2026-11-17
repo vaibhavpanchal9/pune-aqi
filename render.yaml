@@ -1,0 +1,33 @@
+# Render Blueprint: the public API as a free Docker web service.
+#
+# Dashboard: New > Blueprint > pick this repository. Render asks for DATABASE_URL once: paste the
+# READ-ONLY connection string (API_DATABASE_URL in .env, made by make_readonly_role.py). It is stored
+# by Render and never appears in this repository.
+#
+# Free plan: 0.1 CPU, 512 MB, sleeps after 15 minutes without traffic and takes about a minute to wake.
+
+services:
+  - type: web
+    name: pune-aqi-api
+    runtime: docker
+    plan: free
+    region: singapore            # the same region as the database
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /           # a static answer; /health would query the database on every check
+    autoDeployTrigger: commit
+    buildFilter:                 # rebuild only when something inside the image changes, not for docs or notes
+      paths:
+        - Dockerfile
+        - .dockerignore
+        - render.yaml
+        - requirements-api.txt
+        - app.py
+        - service.py
+        - modelfile.py
+        - db.py
+        - healthcheck.py
+        - models/**
+        - tests/test_api.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false              # asked for in the dashboard at creation; not kept in this file

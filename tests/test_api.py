@@ -121,3 +121,39 @@ def test_docs_are_generated(client):
     assert client.get("/docs").status_code == 200
     paths = client.get("/openapi.json").json()["paths"]
     assert set(paths) >= {"/health", "/forecast", "/stats"}
+
+
+# ---------------------------------------------------------------- the short cache in front of the database
+def test_cached_reuses_an_answer_then_asks_again_after_it_expires():
+    import time
+    calls = []
+
+    @service.cached(0.05)
+    def slow(x=1):
+        calls.append(x)
+        return {"x": x, "n": len(calls)}
+
+    assert slow() == slow() == {"x": 1, "n": 1}          # second call: no new work
+    assert slow(2)["n"] == 2 and len(calls) == 2         # a different argument is a different answer
+    time.sleep(0.06)
+    assert slow()["n"] == 3                              # expired: asked again
+
+
+def test_cached_never_remembers_an_error():
+    state = {"fail": True}
+
+    @service.cached(60)
+    def flaky():
+        if state["fail"]:
+            raise RuntimeError("database asleep")
+        return "ok"
+
+    with pytest.raises(RuntimeError):
+        flaky()
+    state["fail"] = False
+    assert flaky() == "ok"                               # the failure was not cached
+
+
+def test_the_three_endpoint_queries_are_cached():
+    for fn, name in [(service.health, "health"), (service.forecast, "forecast"), (service.stats, "stats")]:
+        assert hasattr(fn, "cache_clear") and service.CACHE_SECONDS[name] > 0

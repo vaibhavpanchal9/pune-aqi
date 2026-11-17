@@ -4,14 +4,18 @@
 
 Kept apart from app.py so that (1) the route layer can be tested with fake data and no database, and
 (2) the same numbers can be printed from a terminal when something looks wrong. Every function opens
-one connection, runs its queries, and closes it: a connection per request. Neon's free tier sleeps
-when idle, so the first request after a quiet spell can take a second; a pool is a later item.
+one connection, runs its queries, and closes it. Answers are reused for a short time (CACHE_SECONDS),
+so most requests touch no database at all. Neon's free tier sleeps when idle, so the first uncached
+request after a quiet spell can take a second.
 
 The served sensor, the model version, the tiers and the walk-forward figures are read from the model
 file (modelfile.py), so the API cannot drift from what forecast.py writes.
 """
 
+import functools
 import json
+import threading
+import time
 from contextlib import closing
 from datetime import datetime, timezone
 
@@ -47,6 +51,38 @@ SCORE_COLUMNS = """
 """
 
 
+# How long an answer is reused before the database is asked again. Forecasts change once an hour, so a
+# minute-old answer is the same answer; without this, every request from the public address would open
+# a database connection, and a burst of requests would keep the free-tier database awake all day.
+CACHE_SECONDS = {"health": 30, "forecast": 60, "stats": 300}
+
+
+def cached(seconds):
+    """Remember a function's answer for `seconds`, per set of arguments.
+
+    An error is never remembered: the next call asks again. The slow call runs outside the lock, so a
+    slow query does not block answers that are already in memory.
+    """
+    def wrap(fn):
+        store, lock = {}, threading.Lock()
+
+        @functools.wraps(fn)
+        def inner(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            with lock:
+                hit = store.get(key)
+                if hit is not None and time.monotonic() - hit[0] < seconds:
+                    return hit[1]
+            value = fn(*args, **kwargs)
+            with lock:
+                store[key] = (time.monotonic(), value)
+            return value
+
+        inner.cache_clear = store.clear
+        return inner
+    return wrap
+
+
 def _hours(delta):
     return None if delta is None else round(delta.total_seconds() / 3600, 1)
 
@@ -68,6 +104,7 @@ def _score(row):
 
 
 # ----------------------------------------------------------------------------- /health
+@cached(CACHE_SECONDS["health"])
 def health():
     now = datetime.now(timezone.utc)
     with closing(get_conn()) as conn, conn.cursor() as cur:
@@ -106,6 +143,7 @@ def station_name(cur, sensor_id):
     return None if row is None else row[0]
 
 
+@cached(CACHE_SECONDS["forecast"])
 def forecast(sensor_id=SENSOR):
     """The forecasts on file for hours still ahead, oldest target first. Empty list when none."""
     with closing(get_conn()) as conn, conn.cursor() as cur:
@@ -129,6 +167,7 @@ def forecast(sensor_id=SENSOR):
 
 
 # ----------------------------------------------------------------------------- /stats
+@cached(CACHE_SECONDS["stats"])
 def stats(sensor_id=SENSOR):
     """Live accuracy (this version, per tier, and per version), lead time, availability, walk-forward."""
     with closing(get_conn()) as conn, conn.cursor() as cur:
