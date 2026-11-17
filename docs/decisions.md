@@ -289,3 +289,21 @@ First run: build 20.7 s, 8 passed in 0.36 s inside the container, `/health` "ok"
 and from the local stack after seeding (19 locations, 215 sensors, 7,169 readings, 298 runs, 160
 forecasts). Live record on the same day, v2 after 75 scored hours: MAE 18.4 vs persistence 19.3,
 coverage 0.57; first 9 hours of the `day` tier: 7.6 vs 4.8. Checkpoint stays 29 Nov.
+
+## 2026-11-18 — the API is public: https://pune-aqi-api.onrender.com
+
+Render free web service in Singapore (the database's region), built from the Dockerfile by `render.yaml`.
+Gate 2's condition (the service live on a public address, returning forecasts with bounds) is met on
+18 Nov; the formal check stays on 29 Nov together with the live-record checkpoint.
+
+Choices: (1) **least privilege.** The API logs in as `aqi_api`, which can SELECT five tables and nothing
+else (make_readonly_role.py; a DELETE is refused, checked by the script). The owner credentials stay with
+the ingestion job. (2) **A short cache** in service.py (30 s health, 60 s forecast, 300 s stats): forecasts
+change once an hour, and without it every public request would open a database connection. Errors are
+never cached. (3) **Infrastructure in the repository:** render.yaml holds everything except the one
+secret, which is typed into Render once. (4) **Build filter:** only changes to files inside the image
+trigger a build. (5) Health check on `/`, not `/health`.
+
+First latency (results/latency_2026-11-17.csv, from Pune, service awake): p50 about 180 ms and p95
+between 250 and 320 ms on every endpoint. Known limit: the free host sleeps after 15 idle minutes and
+takes about a minute to wake; to be measured.

@@ -1,0 +1,5 @@
+endpoint,first_ms,first_status,ok,n,p50_ms,p95_ms,max_ms,url,measured_at
+/,328,200,30,30,181,320,378,https://pune-aqi-api.onrender.com,2026-11-17T18:59:05+00:00
+/health,173,200,30,30,177,259,349,https://pune-aqi-api.onrender.com,2026-11-17T18:59:05+00:00
+/forecast,225,200,30,30,177,261,353,https://pune-aqi-api.onrender.com,2026-11-17T18:59:05+00:00
+/stats,241,200,30,30,176,251,261,https://pune-aqi-api.onrender.com,2026-11-17T18:59:05+00:00

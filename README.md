@@ -1,5 +1,8 @@
 # pune-aqi — Pune PM2.5 forecasting service (in progress)
 
+**Live API:** https://pune-aqi-api.onrender.com/docs (free hosting: the first request after a quiet spell takes about a minute)
+
+
 Hourly PM2.5 from 13 reference-grade CPCB/MPCB/IITM stations around Pune, collected continuously
 into a hosted Postgres by a scheduled job, with a 24-hour-ahead forecasting model and an API to follow.
 
