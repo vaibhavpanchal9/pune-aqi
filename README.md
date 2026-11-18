@@ -1,5 +1,8 @@
 # pune-aqi — Pune PM2.5 forecasting service (in progress)
 
+[![ci](https://github.com/vaibhavpanchal9/pune-aqi/actions/workflows/ci.yml/badge.svg)](https://github.com/vaibhavpanchal9/pune-aqi/actions/workflows/ci.yml)
+
+
 **Live API:** https://pune-aqi-api.onrender.com/docs (free hosting: the first request after a quiet spell takes about a minute)
 
 

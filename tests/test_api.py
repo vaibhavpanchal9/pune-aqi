@@ -157,3 +157,11 @@ def test_cached_never_remembers_an_error():
 def test_the_three_endpoint_queries_are_cached():
     for fn, name in [(service.health, "health"), (service.forecast, "forecast"), (service.stats, "stats")]:
         assert hasattr(fn, "cache_clear") and service.CACHE_SECONDS[name] > 0
+
+
+# ---------------------------------------------------------------- the server reports its own time
+def test_every_answer_says_how_long_the_server_took(client):
+    for path in ("/", "/health", "/forecast", "/stats", "/forecast?sensor_id=1"):     # the 404 too
+        header = client.get(path).headers["server-timing"]
+        assert header.startswith("app;dur=")
+        assert 0 <= float(header.split("dur=")[1]) < 5000

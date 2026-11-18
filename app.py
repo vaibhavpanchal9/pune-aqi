@@ -16,11 +16,12 @@ FastAPI validates the inputs and the outputs against the Pydantic models below, 
 interactive documentation at /docs from them. service.py does the database work.
 """
 
+import time
 from datetime import datetime, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 import service
@@ -80,6 +81,20 @@ class StatsResponse(BaseModel):
     tiers: list[dict]
     walk_forward: Optional[dict]
     trained_on: dict
+
+
+# ----------------------------------------------------------------------------- how long the server took
+@app.middleware("http")
+async def server_timing(request: Request, call_next):
+    """Add the standard Server-Timing header: the milliseconds this server spent on the request.
+
+    What a visitor waits is this plus the network, and the network can be 50 ms or 4 seconds depending
+    on where they sit (measured both, 17-18 Nov). The header separates the part that is ours.
+    """
+    start = time.perf_counter()
+    response = await call_next(request)
+    response.headers["Server-Timing"] = f"app;dur={(time.perf_counter() - start) * 1000:.1f}"
+    return response
 
 
 # ----------------------------------------------------------------------------- routes
