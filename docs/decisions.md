@@ -307,3 +307,26 @@ trigger a build. (5) Health check on `/`, not `/health`.
 First latency (results/latency_2026-11-17.csv, from Pune, service awake): p50 about 180 ms and p95
 between 250 and 320 ms on every endpoint. Known limit: the free host sleeps after 15 idle minutes and
 takes about a minute to wake; to be measured.
+
+## 2026-11-18 — CI, coverage, and two clocks for latency
+
+**CI (.github/workflows/ci.yml).** Every push that changes code runs pyflakes and the whole suite on
+Python 3.12 (the cloud job and the image) and 3.14 (the development machine), and builds the Docker
+image, whose own build runs the API tests. Green on the first run. Pushes that touch only docs, notes,
+results or figures are skipped. The hourly `ingest` workflow was left untouched: its unattended record
+matters more than clearing a deprecation warning.
+
+**Coverage: 36.4% of 1,809 statements, 81 tests.** The split is the point: the calculation and decision
+code is covered (metrics and app 100%, transform 80%, tiers 76%, dataset 71%); everything that talks to
+the database or the internet, and the command-line wrappers, is at or near 0%. No file is excluded to
+improve the figure. CI fails below 35% so it cannot slide. Next: tests against a real Postgres in CI,
+because no SQL statement has an automatic test yet.
+
+**requirements.txt** was stale (pandas 3.0.3 pinned, 3.0.5 installed; numpy, matplotlib, pyflakes
+missing). Regenerated from the environment; CI installs exactly these 13 pins.
+
+**Latency.** A morning run showed 2 s per request against 180 ms the night before. `curl -w` showed a
+1.4 s round trip on that network: three round trips, no server time. The API now sends a `Server-Timing`
+header and bench.py reports both clocks: about 1 ms from memory, 44-81 ms with a database query, 617 ms
+when the database is asleep too; 260 ms end to end that evening. Cold start of the free host: 14-25 s,
+measured three times.
