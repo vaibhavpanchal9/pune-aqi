@@ -394,3 +394,71 @@ CI: three green on de2ec40 (Python 3.12, Python 3.14, image).
   real API answer all the way into the table.
 - One-off scripts stay untested on purpose: `explore_api.py`, `audit_sensors.py`, `backfill.py`,
   `quality_report.py`, `apply_schema.py`, `runsql.py`.
+
+## 2026-11-19 — the band stays: sizing it from recent errors does not earn a switch
+
+**The worry.** Live, the full tier of v2 has 125 scored hours and 65.6% of the actuals fell inside a
+band meant to hold 80% (`results/live_2026-11-19.txt`). The band is sized once, from the relative
+errors of the last 8 weeks before the model was fitted, and never changes. Two suspects: eight weeks
+reaches too far back, or "once" is the problem and the band should learn from its own recent misses.
+
+**The experiment** (`band_calibration.py`, results in `results/band_calibration.csv`). The same ridge,
+the same six folds and the same rows as Step 9, with the band sized eight ways: once, from the last
+8, 4 or 2 weeks; or re-sized for every forecast from the errors of the last 56, 28, 14, 7 or 3 days.
+An error is used only once it is known, 24 hours after its forecast; the tests pin that to the hour.
+The script's 8-week band equals the live recipe exactly (largest difference 0.00e+00). The rule for
+switching was written at the top of the script before it was run on the real data.
+
+| Scheme | Mean coverage | Worst fold | fold_miss | Width | Interval score |
+|---|---|---|---|---|---|
+| static_8w (live) | 0.814 | 0.721 | 0.049 | 31.4 | 45.01 |
+| static_4w | 0.759 | 0.670 | 0.058 | 26.0 | 43.80 |
+| static_2w | 0.722 | 0.531 | 0.101 | 24.6 | 46.64 |
+| rolling_56d | 0.798 | 0.743 | 0.040 | 29.1 | 43.88 |
+| rolling_28d | 0.777 | 0.720 | 0.040 | 28.2 | 43.97 |
+| rolling_14d | 0.765 | 0.718 | 0.035 | 28.4 | 44.60 |
+| rolling_7d | 0.751 | 0.727 | 0.049 | 28.9 | 47.13 |
+| rolling_3d | 0.721 | 0.637 | 0.079 | 28.2 | 49.90 |
+
+Data: 10,225 usable rows through 11 Nov 2026 (the feature file written on 13 Nov, when v2 was fitted).
+Test windows: 11 Dec 2025 to 11 Nov 2026.
+
+**What it says.**
+
+1. A shorter look-back is worse, not better. Sized once from 2 weeks, one fold drops to 0.531.
+2. The shorter the memory of a rolling band, the lower its coverage: 0.798, 0.777, 0.765, 0.751, 0.721.
+   With 7 days it is under 0.80 in all six folds. Errors come in runs of days; a short window has
+   seen only the current kind of day, and the next kind falls outside.
+3. Re-sizing with the same 8-week memory (rolling_56d) helps a little: fold_miss 0.040 against 0.049,
+   a band 7% narrower, interval score 43.88 against 45.01. That is real but small.
+4. Shifting the point forecast to the middle of its band does not help. Mean MAE over the folds: plain
+   ridge 8.91, shifted 8.93 at best (rolling_56d) and 9.99 at worst (rolling_3d). Persistence: 9.61.
+
+**Decision: the band stays as it is.** The rule asked for a fold_miss at least 0.02 lower than the
+live band's. The largest gain is 0.014 (rolling_14d), and that scheme holds only 0.765 on average.
+The expectation was that a rolling band would win. It does not, and a band that re-sizes itself is
+one more moving part that has not earned its place.
+
+**Where the live band misses** (`sql/12_band.sql`, Q46 to Q48).
+
+- On both sides: of 125 actuals, 19 fell below the band and 24 above. The band's edges are -0.253 and
+  +0.416 of the forecast; the live errors' 10th and 90th percentile are -0.290 and +0.557, with the
+  middle at +0.116. So this week's errors are wider than the band and lean high.
+- On a few days: 13, 14 and 15 Nov hold 31 of v2's 44 misses. The daily mean went 71.6, 78.1, 54.0:
+  two days the level ran 15 to 20 above the forecast, then one day 20 below it. Persistence was about
+  as far off on those days (MAE 17.4, 19.9, 26.3 against the model's 20.2, 20.7, 20.7): no forecast
+  built on the day before saw these swings coming. On 16, 17 and 19 Nov coverage was 0.83, 0.92 and
+  0.89. On 18 Nov the level jumped again (89.7 against a forecast of 66.2) and coverage was 0.74.
+
+**Also seen, and to be said plainly in the write-up.**
+
+- In the winter fold (11 Dec to 3 Feb) the ridge does not beat persistence: MAE 16.27 against 15.98.
+  In the other five folds it does (9.76 / 10.70, 8.57 / 9.84, 4.73 / 5.21, 4.47 / 5.29, 9.66 / 10.66).
+  The live tie (18.60 against 18.54) is at winter-like levels, so it matches the record rather than
+  contradicting it. The yearly average hides this.
+- Six 8-week test windows cover 48 weeks. 12 Nov to 10 Dec has never been a test window, and that is
+  where the live record is now.
+
+**Still open.** The band holds 0.81 over 48 weeks, but nothing yet says how far a single week can
+stray from that. Next: week-by-week coverage inside the walk-forward folds, so that the live number
+on the 29 Nov checkpoint is judged against that spread and not against 0.80 alone.
