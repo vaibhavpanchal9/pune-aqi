@@ -330,3 +330,67 @@ missing). Regenerated from the environment; CI installs exactly these 13 pins.
 header and bench.py reports both clocks: about 1 ms from memory, 44-81 ms with a database query, 617 ms
 when the database is asleep too; 260 ms end to end that evening. Cold start of the free host: 14-25 s,
 measured three times.
+
+## 2026-11-19 — the SQL gets tests: a real Postgres, on the laptop and in CI
+
+**The hole.** Until today no test touched a database. The API routes were tested with fake queries,
+and the SQL itself was only ever checked by hand (`python service.py`, `runsql.py`). The coverage table
+of 18 Nov showed it: `db.py` 20%, `ingest.py` 0%, `openaq_client.py` 0%, `service.py` 56%.
+
+**What was added.** 51 tests, 81 → 132 (commit de2ec40). How to run them: `docs/testing.md`.
+
+- `tests/test_db_integration.py` (25): applies `schema.sql` to an empty Postgres and runs the real
+  queries. Readings are saved once however often they are offered; an ingest run ends with the right
+  row in `ingestion_runs` (ok / partial / failed); `forecast.py` end to end; the queries behind
+  `/forecast`, `/stats` and `/health`; the copy to a local database; the read-only role.
+- `tests/test_openaq_client.py` (17): what the client retries (network errors, 429, 5xx), what it never
+  retries (401, 410, 422), how long it waits, and paging. No internet: `requests.get` and `time.sleep`
+  are replaced.
+- `tests/test_local_tools.py` (9): `.env` is only ever changed one line at a time, the copy script only
+  writes to this machine, and which request "p95" is.
+
+**Decisions.**
+
+1. A real Postgres, not a mock and not SQLite. What needs testing is Postgres behaviour itself:
+   `ON CONFLICT DO NOTHING`, the foreign key, `DISTINCT ON`, `generate_series` in `v_features`, what a
+   role may and may not do. A mock would test my idea of Postgres, not Postgres.
+2. The tests only run against a Postgres on this machine, and never use the database named in the URL:
+   they create two scratch databases beside it and drop them at the end. Before any table is emptied,
+   the fixture checks that the project's own `get_conn()` really landed on the scratch one.
+3. OpenAQ stays fake in the database tests (prepared answers instead of downloads), so no test needs
+   the internet or the API key.
+4. Without `TEST_DATABASE_URL` the 25 database tests are skipped, so plain `pytest` works with Docker
+   off. CI must never skip them silently, and the coverage floor guards that: it is now 55%, between
+   46.88% (without the database tests) and 60.19% (with them).
+5. The same image (`postgres:16-alpine`) and the same address locally and in CI, so one command line
+   works in both places. In CI it is a service container: an empty Postgres that lives for one job.
+
+**Numbers** (laptop, Python 3.14.7). With the database: 132 passed, coverage 60.19% (1,090 of 1,811
+statements), up from 36.43% (659 of 1,809). Without it: 107 passed, 25 skipped, 46.88% (849 of 1,811).
+By file: `db.py` 20 → 92, `ingest.py` 0 → 99, `openaq_client.py` 0 → 100, `forecast.py` 55 → 99,
+`service.py` 56 → 96, `make_readonly_role.py` 0 → 71, `seed_local.py` 0 → 69, `bench.py` 0 → 46.
+CI: three green on de2ec40 (Python 3.12, Python 3.14, image).
+
+**What the tests found.**
+
+- A bug in `bench.py`. "p95" over the default 30 requests was the 28th value of 30, which is the 93rd
+  percentile: the rank was `round(28.5)`, and Python rounds that to 28. It now rounds up (the 29th).
+  Every p95 measured before today with 30 requests is therefore slightly too low. The latency numbers
+  get measured again before they are used anywhere.
+- Nothing wrong in the SQL. The `/stats` query was checked against a case worked out by hand (three
+  scored forecasts: MAE 10.0, bias -6.67, coverage 0.667, persistence MAE 8.33; readings of 0 and 990
+  left out by the value policy) and it matched.
+- `forecast.py` end to end, on made-up readings. Ten days of hourly readings with the newest 3 h old
+  give 21 forecasts, all `full`; a second run adds 0; one more reading adds 1. With two 5-hour holes:
+  12 `full`, 4 `day`, 5 `short`, and no origin hour without a forecast.
+
+**Known gaps, written down and not fixed today.**
+
+- `healthcheck.py` is at 12%. Its rule is the one `service.health()` uses, and that is tested; the
+  script itself is not.
+- `run_ingest` only catches `OpenAQError`. Any other exception ends the run with its row still saying
+  `running`. To fix, with a test first.
+- The ingest tests replace `flatten_hours` with a fake. It has its own tests, but no test yet takes a
+  real API answer all the way into the table.
+- One-off scripts stay untested on purpose: `explore_api.py`, `audit_sensors.py`, `backfill.py`,
+  `quality_report.py`, `apply_schema.py`, `runsql.py`.
