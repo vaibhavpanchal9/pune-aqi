@@ -2,6 +2,11 @@ name: ci
 
 # Every push that changes code runs the whole test suite on two Python versions and builds the API image.
 # Pushes that only touch docs, notes, results or figures are skipped.
+#
+# The tests job starts its own empty Postgres (a "service container") next to the tests, so the SQL is
+# run for real: tests/test_db_integration.py applies schema.sql to it and exercises every query.
+# That Postgres holds only made-up test rows and is deleted when the job ends. The cloud database is
+# never involved: this workflow has no secrets at all.
 
 on:
   push:
@@ -30,6 +35,22 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.14"]     # 3.12: the cloud job and the image. 3.14: the development machine.
+    services:
+      postgres:
+        image: postgres:16-alpine            # the same image as the local one in docker-compose.yml
+        env:
+          POSTGRES_USER: aqi
+          POSTGRES_PASSWORD: localdev        # not a secret: an empty database that lives for two minutes
+          POSTGRES_DB: aqi
+        ports:
+          - 5433:5432                        # the same address as the local compose database
+        options: >-
+          --health-cmd "pg_isready -U aqi -d aqi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://aqi:localdev@127.0.0.1:5433/aqi
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -41,8 +62,9 @@ jobs:
       - name: lint (unused and undefined names)
         run: python -m pyflakes *.py tests/*.py
       - name: tests with coverage
-        # the floor only stops coverage from sliding backwards; the real number is in the log
-        run: python -m pytest -q --cov=. --cov-report=term --cov-fail-under=35
+        # The floor stops coverage from sliding backwards; the real number is in the log.
+        # It also catches the database tests being skipped by mistake: without them coverage is far below it.
+        run: python -m pytest -q -rs --cov=. --cov-report=term --cov-fail-under=55
 
   image:
     name: docker image (API tests run inside the build)

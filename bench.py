@@ -22,6 +22,7 @@ milliseconds the server itself spent. That part does not change with the visitor
 
 import argparse
 import csv
+import math
 import statistics
 import time
 import urllib.error
@@ -60,9 +61,14 @@ def timed_get(url, timeout=120):
 
 
 def percentile(values, q):
-    """The value below which a share q of the sorted values falls (nearest rank)."""
+    """Nearest rank: the smallest value that has at least a share q of the values at or below it.
+
+    The rank is rounded UP. (Until 19 Nov 2026 this used round(), and Python rounds 28.5 down to 28:
+    with the default 30 requests, "p95" was the 28th value of 30, which is the 93rd percentile.)
+    """
     ordered = sorted(values)
-    return ordered[min(len(ordered) - 1, max(0, round(q * len(ordered)) - 1))]
+    rank = math.ceil(q * len(ordered) - 1e-9)        # minus a hair: 0.07 * 100 is 7.000000000000001
+    return ordered[min(len(ordered) - 1, max(0, rank - 1))]
 
 
 def measure(base, path, n):
