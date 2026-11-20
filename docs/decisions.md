@@ -462,3 +462,52 @@ one more moving part that has not earned its place.
 **Still open.** The band holds 0.81 over 48 weeks, but nothing yet says how far a single week can
 stray from that. Next: week-by-week coverage inside the walk-forward folds, so that the live number
 on the 29 Nov checkpoint is judged against that spread and not against 0.80 alone.
+
+## 2026-11-20 — one week at a time: a yardstick for the live number
+
+**The question.** Step 15 kept the band: over the 48 test weeks it holds 0.81 of the actuals. Live it
+held 0.656 after its first week (19 Nov). A figure for a whole year cannot say whether one week at
+0.66 is a band gone wrong or an ordinary bad week. So: how far did single weeks stray in the record?
+
+**What was done** (`band_weekly.py`, `results/band_weekly.csv`, `figures/band_weekly.png`). Every
+walk-forward test row is scored with the band exactly as it is live, then each 8-week test window is
+cut into single weeks and into fortnights, and each block is scored alone. A block counts only if at
+least half of its hours have a scored forecast. Self-check: the six fold coverages come out as in
+Step 15 (0.823, 0.775, 0.721, 0.847, 0.871, 0.847), and all 5,532 test rows sit in exactly one block.
+
+| Block | Counted | Left out | Lowest | 10th pct | Median | 90th pct | Highest | Under 0.70 | Under 0.65 |
+|---|---|---|---|---|---|---|---|---|---|
+| One week | 36 | 12 | 0.60 | 0.67 | 0.83 | 0.94 | 0.97 | 5 | 3 |
+| Two weeks | 19 | 5 | 0.64 | 0.73 | 0.80 | 0.92 | 0.94 | 1 | 1 |
+
+**How to read the live number with it.**
+
+- One week swings a lot. 5 of 36 test weeks were under 0.70, about one in seven. Three were lower than
+  the live band's first week (0.656). A bad week, and not an unheard-of one.
+- Two weeks swing much less. Only 1 of 19 fortnights was under 0.70, and the median is 0.80.
+- So the checkpoint line was put in a sensible place. On 29 Nov the full tier will have about 16 days
+  of record. Under 0.70 then would be worse than 18 of 19 fortnights in the record: unusual, and to be
+  reported as such. At or above 0.70 is inside what the record shows.
+- The number judged on 29 Nov is the coverage of v2's full tier, the one that was flagged. Today it is
+  0.677 on 158 scored hours (all of v2 together: 124 of 176, 0.705).
+
+**The same yardstick for accuracy.** The ridge had the lower MAE in 33 of 36 test weeks and 16 of 19
+fortnights. All three losing weeks are in the winter fold (11 Dec to 3 Feb; ridge MAE / persistence
+MAE of 1.12, 1.17 and 1.06), which fits what Step 15 showed for that fold. Of the three losing
+fortnights two are in the winter fold (1.03, 1.02) and one is in the monsoon fold (1.21; it contains
+a thin week).
+
+**Live today** (`results/live_2026-11-20.txt`). Full tier of v2, 158 scored hours: MAE 17.58 against
+18.34 for persistence (4% lower; it was a tie until now); bias -2.18; coverage 0.677. Day by day since
+16 Nov the band held 0.83, 0.92, 0.74, 0.75 and 0.83. Availability: 168 of 168 hours again.
+
+**What the yardstick does not cover.**
+
+- 12 of the 48 test weeks are left out because fewer than half of their hours have a full-tier
+  forecast. Six of them are in January and February 2026 (8 to 28 Jan, 5 to 25 Feb) and three are the
+  last three weeks before v2 was fitted (22 Oct to 11 Nov). So the yardstick has less winter in it
+  than the calendar has.
+- 12 Nov to 10 Dec has never been a test window, and that is where the live record is.
+
+**Decision.** Nothing changes in what is served. The 29 Nov checkpoint stands as written, now with
+something to judge the number against.
