@@ -1,27 +1,27 @@
 dimension,segment,n,mae_model,mae_benchmark,model_minus_benchmark,winner
-fold,1,1015,15.39,14.95,0.44,persistence
-fold,2,673,10.36,11.31,-0.96,ridge
-fold,3,1085,9.42,10.73,-1.31,ridge
-fold,4,1064,5.22,5.91,-0.69,ridge
-fold,5,1024,4.43,5.25,-0.82,ridge
-fold,6,900,7.13,7.99,-0.86,ridge
-month,2025-11,74,10.39,8.94,1.44,persistence
-month,2025-12,733,14.81,14.52,0.3,persistence
-month,2026-01,307,17.43,17.68,-0.25,ridge
-month,2026-02,248,9.71,10.32,-0.61,ridge
-month,2026-03,612,9.66,10.87,-1.21,ridge
-month,2026-04,636,10.21,11.58,-1.37,ridge
-month,2026-05,537,6.12,7.0,-0.88,ridge
-month,2026-06,523,5.11,5.79,-0.69,ridge
-month,2026-07,617,4.55,5.11,-0.57,ridge
+fold,1,843,16.27,15.98,0.29,persistence
+fold,2,845,9.76,10.7,-0.94,ridge
+fold,3,1063,8.57,9.84,-1.26,ridge
+fold,4,1075,4.73,5.21,-0.49,ridge
+fold,5,976,4.47,5.29,-0.82,ridge
+fold,6,730,9.66,10.66,-1.0,ridge
+month,2025-12,491,15.12,15.43,-0.31,ridge
+month,2026-01,307,18.72,17.68,1.04,persistence
+month,2026-02,248,10.23,10.32,-0.09,ridge
+month,2026-03,612,9.69,10.87,-1.18,ridge
+month,2026-04,636,10.19,11.58,-1.39,ridge
+month,2026-05,537,6.19,7.0,-0.81,ridge
+month,2026-06,523,5.13,5.79,-0.66,ridge
+month,2026-07,617,4.59,5.11,-0.52,ridge
 month,2026-08,541,4.14,5.06,-0.93,ridge
-month,2026-09,615,5.91,6.59,-0.68,ridge
-month,2026-10,318,9.08,10.17,-1.1,ridge
-time_of_day,afternoon 12-17,1440,8.19,8.74,-0.55,ridge
-time_of_day,evening 18-23,1380,7.92,8.76,-0.84,ridge
-time_of_day,morning 06-11,1521,9.45,10.3,-0.85,ridge
-time_of_day,night 00-05,1420,8.6,9.11,-0.51,ridge
-level,1 Good (<=30),3231,6.01,6.57,-0.56,ridge
-level,2 Satisfactory (31-60),1554,9.31,11.2,-1.89,ridge
-level,3 Moderate (61-90),696,12.22,13.58,-1.35,ridge
-level,4 Poor or worse (>90),280,24.72,18.64,6.08,persistence
+month,2026-09,615,5.9,6.59,-0.69,ridge
+month,2026-10,318,9.1,10.17,-1.07,ridge
+month,2026-11,87,21.36,22.52,-1.16,ridge
+time_of_day,afternoon 12-17,1388,8.19,8.79,-0.6,ridge
+time_of_day,evening 18-23,1323,7.99,8.84,-0.86,ridge
+time_of_day,morning 06-11,1473,9.9,10.61,-0.7,ridge
+time_of_day,night 00-05,1348,8.2,8.9,-0.7,ridge
+level,1 Good (<=30),3215,5.96,6.53,-0.57,ridge
+level,2 Satisfactory (31-60),1510,9.22,11.0,-1.78,ridge
+level,3 Moderate (61-90),554,13.63,14.62,-1.0,ridge
+level,4 Poor or worse (>90),253,27.47,22.99,4.48,persistence

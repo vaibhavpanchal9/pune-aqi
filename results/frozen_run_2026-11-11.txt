@@ -1,0 +1,287 @@
+Sat Nov 21 18:24:44 IST 2026
+4511c99e0868bc1e81e196d90ebbfc5e0035c6036fa2013d90b03002ef691f64  data/features_12238693.csv
+
+===== python baselines.py =====
+sensor 12238693 · test = last 8 weeks: 2026-09-17 00:30:00+00:00 -> 2026-11-11 23:30:00+00:00 (730 rows) · train rows 9474
+    baseline   n   mae  rmse   bias
+ persistence 730 10.66 18.90  -2.77
+    mean_24h 730 11.81 20.49  -3.40
+weekly_naive 730 15.38 24.98  -9.09
+ climatology 730 18.90 27.00 -18.55
+
+BENCHMARK: persistence  MAE 10.66 µg/m³  — every model must beat this on these rows.
+written: results/baselines.csv
+
+===== python evaluate.py =====
+sensor 12238693 · 6 folds · 10225 usable rows
+
+MAE per fold (µg/m³):
+fold              1      2      3     4     5      6   mean
+model                                                      
+persistence   15.98  10.70   9.84  5.21  5.29  10.66   9.61
+mean_24h      22.30  13.40   9.48  4.70  4.36  11.81  11.01
+climatology   19.01  13.16   9.91  4.89  4.09  18.90  11.66
+weekly_naive  23.25  18.24  13.16  6.50  5.28  15.38  13.63
+
+BENCHMARK (mean MAE across folds): persistence  9.61 µg/m³
+written: results/baselines_folds.csv, figures/folds.png
+
+===== python train.py =====
+fitting ridge on 6 folds ...
+fitting ridge_lags_only on 6 folds ...
+fitting hgb_lags_only on 6 folds ...
+fitting hgb_all on 6 folds ...
+fitting hgb_all_delta on 6 folds ...
+fitting hgb_all_delta_sq on 6 folds ...
+fitting hgb_all_logratio on 6 folds ...
+fitting blend_ridge_hgb on 6 folds ...
+
+sensor 12238693 · 10225 usable rows · features: 21 (lags-only: 14)
+
+MAE per fold (µg/m³), best first:
+fold                  1      2      3     4     5      6   mean
+model                                                          
+ridge             16.27   9.76   8.57  4.73  4.47   9.66   8.91
+ridge_lags_only   16.02  10.03   8.85  4.61  4.42   9.82   8.96
+blend_ridge_hgb   17.09   9.66   8.43  4.34  4.18  10.91   9.10
+persistence       15.98  10.70   9.84  5.21  5.29  10.66   9.61
+hgb_lags_only     17.81  10.70   8.85  4.39  4.23  12.41   9.73
+hgb_all_delta_sq  19.63  10.33   8.48  4.29  4.12  13.30  10.02
+hgb_all_delta     20.06  10.25   8.50  4.28  4.15  13.07  10.05
+hgb_all           21.85  10.25   8.18  4.26  4.08  14.57  10.53
+hgb_all_logratio  21.62  10.40   8.27  4.42  4.15  15.47  10.72
+mean_24h          22.30  13.40   9.48  4.70  4.36  11.81  11.01
+climatology       19.01  13.16   9.91  4.89  4.09  18.90  11.66
+weekly_naive      23.25  18.24  13.16  6.50  5.28  15.38  13.63
+
+benchmark (persistence) 9.61 · best ridge 8.91 · improvement 7.3%
+written: results/model_comparison.csv
+
+===== python error_analysis.py =====
+sensor 12238693 · 5532 out-of-sample forecasts · overall MAE ridge 8.60 vs persistence 9.31
+
+== by fold ==
+segment    n  mae_model  mae_benchmark  model_minus_benchmark      winner
+      1  843      16.27          15.98                   0.29 persistence
+      2  845       9.76          10.70                  -0.94       ridge
+      3 1063       8.57           9.84                  -1.26       ridge
+      4 1075       4.73           5.21                  -0.49       ridge
+      5  976       4.47           5.29                  -0.82       ridge
+      6  730       9.66          10.66                  -1.00       ridge
+
+== by time_of_day ==
+        segment    n  mae_model  mae_benchmark  model_minus_benchmark winner
+afternoon 12-17 1388       8.19           8.79                  -0.60  ridge
+  evening 18-23 1323       7.99           8.84                  -0.86  ridge
+  morning 06-11 1473       9.90          10.61                  -0.70  ridge
+    night 00-05 1348       8.20           8.90                  -0.70  ridge
+
+== by level ==
+               segment    n  mae_model  mae_benchmark  model_minus_benchmark      winner
+         1 Good (<=30) 3215       5.96           6.53                  -0.57       ridge
+2 Satisfactory (31-60) 1510       9.22          11.00                  -1.78       ridge
+    3 Moderate (61-90)  554      13.63          14.62                  -1.00       ridge
+ 4 Poor or worse (>90)  253      27.47          22.99                   4.48 persistence
+
+== by month ==
+segment   n  mae_model  mae_benchmark  model_minus_benchmark      winner
+2025-12 491      15.12          15.43                  -0.31       ridge
+2026-01 307      18.72          17.68                   1.04 persistence
+2026-02 248      10.23          10.32                  -0.09       ridge
+2026-03 612       9.69          10.87                  -1.18       ridge
+2026-04 636      10.19          11.58                  -1.39       ridge
+2026-05 537       6.19           7.00                  -0.81       ridge
+2026-06 523       5.13           5.79                  -0.66       ridge
+2026-07 617       4.59           5.11                  -0.52       ridge
+2026-08 541       4.14           5.06                  -0.93       ridge
+2026-09 615       5.90           6.59                  -0.69       ridge
+2026-10 318       9.10          10.17                  -1.07       ridge
+2026-11  87      21.36          22.52                  -1.16       ridge
+
+segments where persistence wins: 3 of 26
+written: results/error_analysis.csv, figures/error_by_hour.png, error_vs_level.png, pred_vs_actual.png
+
+===== python intervals.py =====
+evaluating residual_quantiles ...
+evaluating residual_ratio ...
+evaluating quantile_regression ...
+
+sensor 12238693 · nominal coverage 80% · 6 folds
+
+                     coverage   width  coverage_poor_plus  n_poor_plus
+method                                                                
+residual_quantiles      0.791  29.075               0.367          253
+residual_ratio          0.814  31.380               0.463          253
+quantile_regression     0.701  22.427               0.395          253
+
+per fold:
+method  quantile_regression  residual_quantiles  residual_ratio
+fold                                                           
+1                     0.600               0.693           0.823
+2                     0.705               0.924           0.775
+3                     0.643               0.857           0.721
+4                     0.694               0.964           0.847
+5                     0.780               0.786           0.871
+6                     0.786               0.522           0.847
+
+mean coverage and fold-to-fold miss:
+                     coverage   width  fold_miss
+method                                          
+residual_quantiles      0.791  29.075      0.124
+residual_ratio          0.814  31.380      0.049
+quantile_regression     0.701  22.427      0.099
+
+pick: residual_ratio  (coverage 0.814, worst fold 0.721, width 31.4)
+written: results/intervals.csv, figures/intervals.png
+
+===== python tiers.py =====
+evaluating three tiers on six walk-forward folds ...
+
+sensor 12238693 · out-of-sample, six folds of 8 weeks · MAE in µg/m³
+
+what the dropped lags cost (same rows as the full model), and the band:
+ tier  features  needs_hours  usable_rows  mae_folds  n_common  mae_common  coverage  worst_fold_coverage  width
+ full        21          168        10225      8.911      5532       8.601     0.814                0.721 31.380
+  day        18           24        12130      8.822      5532       8.704     0.815                0.707 31.180
+short        15            3        12920      8.966      5532       8.772     0.814                0.711 31.908
+
+the rows each tier would actually serve (no richer tier complete), against persistence:
+          tier  n_served  mae_served  persistence_served  coverage_served
+          full      5532       8.601               9.312            0.812
+           day       908       7.885               9.084            0.869
+         short       382      10.150              10.669            0.825
+  cascade (v2)      6822       8.592               9.358              NaN
+full only (v1)      5532       8.601               9.312              NaN
+
+availability over the 48 test weeks (8064 grid hours, 7386 with a reading):
+up_to_tier  hours  share_of_grid_hours  share_of_hours_with_a_reading
+      full   5914                0.733                          0.801
+       day   6892                0.855                          0.933
+     short   7307                0.906                          0.989
+
+written: results/tier_comparison.csv, results/tier_availability.csv
+
+===== python band_calibration.py =====
+sensor 12238693 · usable rows 10,225 · 2025-02-25 to 2026-11-11 23:30 UTC · nominal coverage 80%
+
+ fold  train_rows  test_from    test_to  test_rows
+    1        4670 2025-12-11 2026-02-03        843
+    2        5536 2026-02-05 2026-04-01        845
+    3        6357 2026-04-02 2026-05-27       1063
+    4        7434 2026-05-28 2026-07-22       1075
+    5        8503 2026-07-23 2026-09-16        976
+    6        9474 2026-09-17 2026-11-11        730
+
+self-check: static_8w here against intervals.py's residual-ratio band, largest difference 0.00e+00
+
+mean over the folds (coverage target 0.80; fold_miss and interval_score: lower is better):
+             coverage  worst_fold  best_fold  fold_miss   width  interval_score  below  above
+scheme                                                                                       
+static_8w       0.814       0.721      0.871      0.049  31.380          45.012  0.084  0.102
+static_4w       0.759       0.670      0.846      0.058  26.003          43.800  0.117  0.124
+static_2w       0.722       0.531      0.867      0.101  24.570          46.641  0.146  0.132
+rolling_56d     0.798       0.743      0.864      0.040  29.077          43.883  0.094  0.109
+rolling_28d     0.777       0.720      0.850      0.040  28.220          43.970  0.111  0.112
+rolling_14d     0.765       0.718      0.802      0.035  28.368          44.604  0.117  0.118
+rolling_7d      0.751       0.727      0.777      0.049  28.942          47.129  0.121  0.128
+rolling_3d      0.721       0.637      0.782      0.079  28.210          49.897  0.139  0.140
+
+coverage per fold:
+fold             1      2      3      4      5      6
+scheme                                               
+static_8w    0.823  0.775  0.721  0.847  0.871  0.847
+static_4w    0.670  0.727  0.733  0.846  0.774  0.803
+static_2w    0.670  0.531  0.725  0.867  0.755  0.781
+rolling_56d  0.773  0.755  0.743  0.864  0.827  0.823
+rolling_28d  0.743  0.720  0.757  0.850  0.795  0.796
+rolling_14d  0.749  0.718  0.770  0.802  0.789  0.766
+rolling_7d   0.750  0.731  0.763  0.758  0.777  0.727
+rolling_3d   0.637  0.711  0.716  0.737  0.782  0.745
+
+width per fold:
+fold            1     2     3     4     5     6
+scheme                                         
+static_8w    63.2  35.9  21.9  16.8  18.6  31.8
+static_4w    40.2  30.3  22.8  17.6  16.0  29.1
+static_2w    40.2  23.6  22.4  18.6  14.3  28.4
+rolling_56d  53.3  33.7  23.8  17.5  16.3  29.8
+rolling_28d  50.4  32.8  25.2  17.4  15.0  28.6
+rolling_14d  53.1  32.5  26.3  16.0  14.7  27.6
+rolling_7d   59.0  33.0  26.4  15.0  14.4  25.9
+rolling_3d   55.7  33.5  23.5  14.5  14.8  27.3
+
+MAE per fold: the plain ridge, the ridge shifted to the middle of the band, and persistence:
+fold               1      2     3     4     5      6  mean
+scheme                                                    
+static_8w      16.14  10.39  8.40  4.98  4.78   9.70  9.06
+static_4w      16.03  10.19  8.57  4.93  4.92  10.09  9.12
+static_2w      16.03  11.09  8.64  5.00  4.71  10.56  9.34
+rolling_56d    16.09  10.01  8.47  4.72  4.61   9.69  8.93
+rolling_28d    16.22  10.27  8.56  4.71  4.56   9.78  9.02
+rolling_14d    16.12  10.58  8.79  4.81  4.63   9.82  9.12
+rolling_7d     16.93  10.86  8.75  4.76  4.57  10.36  9.37
+rolling_3d     20.08  11.27  9.02  4.73  4.58  10.28  9.99
+(plain ridge)  16.27   9.76  8.57  4.73  4.47   9.66  8.91
+(persistence)  15.98  10.70  9.84  5.21  5.29  10.66  9.61
+
+share of test hours where a rolling window had fewer than 48 known errors and static_8w's numbers were used:
+scheme
+rolling_14d    0.025
+rolling_7d     0.070
+rolling_3d     0.231
+
+THE RULE says: keep static_8w. Reason: no scheme is closer to 0.80 fold by fold by the 0.02 the rule asks for (the largest gain is 0.014, by rolling_14d).
+written: results/band_calibration.csv, figures/band_calibration.png
+
+===== python band_weekly.py =====
+sensor 12238693 · usable rows 10,225 · 2025-02-25 to 2026-11-11 23:30 UTC · test windows 2025-12-10 to 2026-11-11
+self-check: all 5,532 test rows are in exactly one week and one fortnight
+coverage per fold (must be Step 15's static_8w row): 0.823  0.775  0.721  0.847  0.871  0.847   mean of folds 0.814, all rows together 0.812
+
+ONE WEEK AT A TIME  (a week counts if at least 84 of its 168 hours are scored)
+coverage of the 80% band:
+      week 1  week 2  week 3  week 4  week 5  week 6  week 7  week 8
+fold                                                                
+1       0.90    0.83    0.91    0.68     NaN     NaN     NaN    0.90
+2        NaN     NaN     NaN    0.74    0.94    0.60    0.90    0.67
+3       0.74    0.76    0.72    0.79    0.74    0.75    0.64    0.65
+4       0.77    0.82    0.84    0.85     NaN    0.96    0.90    0.89
+5       0.83    0.78    0.94    0.89    0.91     NaN    0.94    0.80
+6       0.81    0.73     NaN    0.97    0.89     NaN     NaN     NaN
+36 counted, 12 left out.  lowest 0.60 · 10th percentile 0.67 · median 0.83 · 90th percentile 0.94 · highest 0.97
+how many were under 0.50: 0 · under 0.60: 1 · under 0.65: 3 · under 0.70: 5 · under 0.75: 10 · under 0.80: 16   (of 36)
+ridge MAE / persistence MAE (under 1.00 = the ridge was better):
+      week 1  week 2  week 3  week 4  week 5  week 6  week 7  week 8
+fold                                                                
+1       1.12    0.94    0.86    1.17     NaN     NaN     NaN    1.06
+2        NaN     NaN     NaN    0.91    0.79    0.96    0.88    0.89
+3       0.92    0.83    0.84    0.89    0.94    0.87    0.83    0.91
+4       0.86    0.89    0.83    0.82     NaN    0.99    0.92    0.89
+5       0.85    0.77    0.81    0.82    0.86     NaN    0.74    0.99
+6       0.89    0.88     NaN    0.88    0.85     NaN     NaN     NaN
+the ridge was better in 33 of 36
+
+TWO WEEKS AT A TIME  (a fortnight counts if at least 168 of its 336 hours are scored)
+coverage of the 80% band:
+      fortnight 1  fortnight 2  fortnight 3  fortnight 4
+fold                                                    
+1            0.86         0.79          NaN          NaN
+2             NaN         0.71         0.74         0.79
+3            0.75         0.76         0.75         0.64
+4            0.80         0.84         0.85         0.90
+5            0.80         0.91         0.92         0.85
+6            0.77         0.94          NaN          NaN
+19 counted, 5 left out.  lowest 0.64 · 10th percentile 0.73 · median 0.80 · 90th percentile 0.92 · highest 0.94
+how many were under 0.50: 0 · under 0.60: 0 · under 0.65: 1 · under 0.70: 1 · under 0.75: 5 · under 0.80: 10   (of 19)
+ridge MAE / persistence MAE (under 1.00 = the ridge was better):
+      fortnight 1  fortnight 2  fortnight 3  fortnight 4
+fold                                                    
+1            1.03         1.02          NaN          NaN
+2             NaN         0.97         0.92         0.89
+3            0.88         0.87         0.90         0.86
+4            0.88         0.83         1.21         0.90
+5            0.81         0.82         0.88         0.89
+6            0.89         0.92          NaN          NaN
+the ridge was better in 16 of 19
+
+written: results/band_weekly.csv, figures/band_weekly.png
