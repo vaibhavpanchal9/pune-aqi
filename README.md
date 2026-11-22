@@ -15,7 +15,7 @@ spell can take up to a minute)
 | **Model** | Ridge regression on the station's own past: lags, rolling means, time of day and season. 24 hours ahead, with an 80% band. |
 | **Accuracy** | 7.3% better than "same as now" over 48 test weeks (MAE 8.91 against 9.61 µg/m³). The 80% band held 81% of the actuals. |
 | **Live record** | Each forecast is written once and scored when the actual arrives. The running record is public at `/stats`. |
-| **Engineering** | PostgreSQL, FastAPI, Docker, CI on every code push, 151 automated tests, 25 of them against a real Postgres. |
+| **Engineering** | PostgreSQL, FastAPI, Docker, CI on every code push, more than 150 automated tests, 25 of them against a real Postgres. |
 
 Where the model loses is in this README too: [Where it loses](#where-it-loses).
 
@@ -105,7 +105,12 @@ the model's relative errors on the 8 weeks before it was fitted
 | Fixed width | 0.791 | 0.522 to 0.964 |
 | Quantile regression | 0.701 | 0.600 to 0.786 |
 
-![Forecasts with the 80% band](figures/intervals.png)
+![Two weeks of forecasts next to what was measured](figures/forecast_example.png)
+
+The picture is an ordinary fortnight from the newest test window, 22 September to 6 October 2026. It
+was chosen by a rule and not by eye: the most recent 14 days in which at least 80% of the hours have a
+forecast. On it the MAE is 7.51 against 8.21 for persistence, and 77% of the actuals are inside the
+band. A break in a line is an hour with no forecast or no reading.
 
 Two later checks, both kept in the repo:
 
@@ -147,6 +152,14 @@ against 9.08, and 10.15 against 10.67).
 - **One station.** 13 stations are collected; one is modelled.
 - **An untested month.** Six 8-week windows cover 48 weeks. 12 November to 10 December has never been
   a test window.
+
+The week of Diwali 2026 shows the second and third points in one picture. On Monday 9 November at
+09:00, the morning after Diwali night, the station read 285 µg/m³. The forecast made a day earlier
+said 77, with a band reaching up to 113. The model can only react once a spike is in its own inputs,
+and that is a day too late. The breaks are real holes: only 62 of that week's 168 hours have both a
+forecast and a reading.
+
+![Diwali week: the forecast a day ahead and what was measured](figures/forecast_diwali.png)
 
 ## The live record
 
@@ -214,7 +227,7 @@ The API with a local Postgres in Docker: [docs/docker.md](docs/docker.md). The d
 | Serve | `service.py`, `app.py`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `make_readonly_role.py`, `seed_local.py`, `bench.py` |
 | Check | `tests/`, `.github/workflows/ci.yml` |
 | Run on a schedule | `.github/workflows/ingest.yml` |
-| Record | `docs/`, `results/`, `figures/` |
+| Record | `docs/`, `results/`, `figures/`, `readme_figures.py` |
 
 Documents: [decisions](docs/decisions.md) · [runbook](docs/runbook.md) · [API](docs/api.md) ·
 [Docker](docs/docker.md) · [deployment](docs/deploy.md) · [testing](docs/testing.md) ·

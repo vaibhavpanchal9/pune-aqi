@@ -564,3 +564,34 @@ evaluation scripts were run on it in one go.
 - README and resume take their numbers from this run. Dated notes and earlier entries keep theirs:
   they were true for the data of their day.
 - 151 automated tests as of today (126 without a database, 25 against Postgres).
+
+## 2026-11-22 — a new README, and a forecast picture that does not flatter
+
+**The README** was still the "in progress" page of 30 Oct. It is rewritten: what the project is, how
+it works, the results of the frozen run (each number linked to its result file), where the model
+loses, the live record with its date, how to run it. Every link in it is checked against git.
+
+**The old forecast picture was wrong in three ways** (`figures/intervals.png`, from `intervals.py`,
+7 Nov). Seen only when the README showed it on GitHub:
+
+- Its title said "last 14 days", but it drew the last 336 scored hours, and with the holes in the
+  data those run from early October to mid-November: five weeks.
+- It joined the points on both sides of a hole with a straight line, so a week without data looked
+  like a week with a flat forecast.
+- It drew each forecast at the hour it was made, not the hour it was for. Everything was a day off.
+
+**What replaces it in the README** (`readme_figures.py`, tested in `tests/test_readme_figures.py`):
+
+- `figures/forecast_example.png`: an ordinary fortnight chosen by a rule, the most recent 14 days of
+  the test windows with at least 80% of the hours present. That is 22 Sep to 6 Oct 2026: 272 of 336
+  hours, MAE 7.51 against 8.21 for persistence, 77% of the actuals inside the band.
+- `figures/forecast_diwali.png`: 5 to 11 Nov 2026. Highest reading 285 µg/m³ on Mon 9 Nov at 09:00 IST;
+  the forecast for that hour was 77, band up to 113. Only 62 of the 168 hours have a forecast and a
+  reading. It is in the README under "Where it loses".
+
+Both draw a forecast at the hour it is for, and break the line at every missing hour.
+
+**Left as it is for now.** `figures/intervals.png` and the function that draws it. The README no longer
+shows it. To fix when `intervals.py` is next run.
+
+157 automated tests as of today (132 without a database, 25 against Postgres).
