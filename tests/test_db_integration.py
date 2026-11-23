@@ -7,8 +7,8 @@ Without TEST_DATABASE_URL every test here is skipped, so plain `pytest -q` still
 In CI the variable points at a Postgres service container (.github/workflows/ci.yml).
 
 What is real and what is fake:
-  real   schema.sql, every query in db.py / ingest.py / dataset.py / forecast.py / service.py /
-         seed_local.py / make_readonly_role.py, and Postgres itself
+  real   schema.sql, every query in db.py / ingest.py / healthcheck.py / dataset.py / forecast.py /
+         service.py / seed_local.py / make_readonly_role.py, and Postgres itself
   fake   OpenAQ (ingest's download functions are replaced by a dict of prepared answers)
 
 Safety. These tests create and DROP databases and a role, so:
@@ -34,6 +34,7 @@ import pytest
 import dataset
 import db
 import forecast
+import healthcheck
 import ingest
 import make_readonly_role
 import seed_local
@@ -320,6 +321,55 @@ def test_a_run_with_no_registered_sensors_is_recorded_as_failed(conn, fake_opena
     assert (status, mode) == ("failed", "backfill") and "--discover" in error
 
 
+def test_a_crash_is_recorded_before_it_stops_the_run(conn, fake_openaq):
+    """Anything that is not an OpenAQ refusal (a bug, an answer in a new shape) stops the run loudly,
+    but never without closing its row. Before 23 Nov 2026 the row stayed at 'running' for ever."""
+    register(conn, sensor_id=101, location_id=1, name="Pashan")
+    register(conn, sensor_id=201, location_id=2, name="Hadapsar")
+    fake_openaq[101] = [[reading(101, ago(2), 40.0), reading(101, ago(1), 41.0)]]
+    fake_openaq[201] = KeyError("period")                                           # as if OpenAQ renamed a field
+    with pytest.raises(KeyError):
+        ingest.run_ingest(conn, "from", "to", mode="live")
+    status, _, tried, fetched, inserted, error = last_run(conn)
+    assert (status, tried, fetched, inserted) == ("failed", 2, 2, 2)
+    assert error.startswith("crashed: KeyError")
+    assert count(conn, "ingestion_runs", "status = 'running'") == 0
+    assert count(conn, "measurements") == 2                                         # the first station's rows are kept
+
+
+def test_a_database_error_is_recorded_too(conn, fake_openaq):
+    """A failed statement leaves the transaction unusable: the row can only be closed after a rollback."""
+    register(conn, sensor_id=101, location_id=1, name="Pashan")
+    fake_openaq[101] = [[reading(999999, ago(1), 40.0)]]                            # a sensor nobody registered
+    with pytest.raises(psycopg2.errors.ForeignKeyViolation):
+        ingest.run_ingest(conn, "from", "to", mode="live")
+    status, _, _, _, inserted, error = last_run(conn)
+    assert (status, inserted) == ("failed", 0) and error.startswith("crashed: ForeignKeyViolation")
+    assert count(conn, "measurements") == 0
+
+
+def test_a_crash_before_the_first_sensor_is_recorded(conn, monkeypatch):
+    def broken(conn):
+        raise RuntimeError("the registry query failed")
+    monkeypatch.setattr(ingest, "active_sensors", broken)
+    with pytest.raises(RuntimeError):
+        ingest.run_ingest(conn, "from", "to", mode="live")
+    status, _, tried, _, _, error = last_run(conn)
+    assert (status, tried) == ("failed", 0) and "the registry query failed" in error
+
+
+def test_if_the_crash_cannot_be_recorded_the_first_error_is_still_the_one_raised(conn, fake_openaq, monkeypatch):
+    register(conn, sensor_id=101, location_id=1, name="Pashan")
+    fake_openaq[101] = ValueError("the real problem")
+
+    def database_is_gone(*args, **kwargs):
+        raise psycopg2.OperationalError("connection is gone")
+
+    monkeypatch.setattr(ingest, "finish_run", database_is_gone)
+    with pytest.raises(ValueError, match="the real problem"):                       # not the OperationalError
+        ingest.run_ingest(conn, "from", "to", mode="live")
+
+
 def test_discovery_registers_stations_then_finds_the_live_sensor_of_each(conn, monkeypatch):
     """Pass 1 lists stations. Pass 2 asks each station which of its sensors is still reporting."""
     stations = [location(1, "Pashan", [101, 102]), location(2, "Hadapsar", [201]), location(3, "Katraj", [301])]
@@ -364,6 +414,68 @@ def test_the_command_line_decides_the_window(conn, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["ingest.py", "--discover"])                   # refresh the registry, then stop
     ingest.main()
     assert asked[-1] == "discover" and len(asked) == 3
+
+
+# ----------------------------------------------------------------------------- healthcheck.py: the script itself
+def pipeline_state(conn, run_hours_ago, reading_hours_ago, status="ok", error=None):
+    """One run and one reading, each so many hours old. Everything older is removed first."""
+    with conn.cursor() as cur:
+        cur.execute("TRUNCATE ingestion_runs, measurements")
+        cur.execute("INSERT INTO ingestion_runs (run_at, source, mode, status, rows_inserted, error_text) "
+                    "VALUES (%s, 'openaq', 'live', %s, 13, %s)", (now() - timedelta(hours=run_hours_ago), status, error))
+    conn.commit()
+    db.insert_measurements(conn, [reading(SENSOR, now() - timedelta(hours=reading_hours_ago), 40.0)])
+
+
+def run_healthcheck(capsys):
+    code = healthcheck.main()
+    return code, capsys.readouterr().out
+
+
+def test_healthcheck_is_green_when_our_job_ran_and_their_data_is_fresh(conn, capsys):
+    register(conn)
+    pipeline_state(conn, run_hours_ago=1, reading_hours_ago=2)
+    code, out = run_healthcheck(capsys)
+    assert code == 0 and "STATUS: OK\n" in out and "UPSTREAM" not in out
+    assert "total rows          : 1" in out and "runs in last 24h    : ok=1" in out and "(+13 rows)" in out
+
+
+def test_healthcheck_warns_but_stays_green_when_only_their_data_is_late(conn, capsys, monkeypatch):
+    register(conn)
+    pipeline_state(conn, run_hours_ago=1, reading_hours_ago=healthcheck.UPSTREAM_HOURS + 1)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    code, out = run_healthcheck(capsys)
+    assert code == 0 and "UPSTREAM LAG" in out and "::warning::" not in out
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")                    # inside the hourly job: a yellow note on the run
+    code, out = run_healthcheck(capsys)
+    assert code == 0 and "::warning::upstream lag" in out
+
+
+def test_healthcheck_is_red_when_our_job_has_not_succeeded_for_too_long(conn, capsys):
+    register(conn)
+    pipeline_state(conn, run_hours_ago=healthcheck.STALE_HOURS + 1, reading_hours_ago=2)
+    code, out = run_healthcheck(capsys)
+    assert code == 1 and "STATUS: BROKEN" in out and f"limit {healthcheck.STALE_HOURS} h" in out
+
+
+def test_a_failed_run_does_not_count_as_alive_and_its_error_is_shown(conn, capsys):
+    register(conn)
+    pipeline_state(conn, run_hours_ago=1, reading_hours_ago=2, status="failed", error="crashed: KeyError: 'period'")
+    code, out = run_healthcheck(capsys)
+    assert code == 1 and "last successful run: never" in out
+    assert "failed=1" in out and "last error          : crashed: KeyError" in out
+
+
+def test_a_partial_run_counts_as_alive(conn, capsys):
+    register(conn)
+    pipeline_state(conn, run_hours_ago=1, reading_hours_ago=2, status="partial", error="sensor 101 (Pashan): 503")
+    code, out = run_healthcheck(capsys)
+    assert code == 0 and "STATUS: OK\n" in out and "partial=1" in out
+
+
+def test_healthcheck_on_an_empty_database_is_red_and_does_not_crash(conn, capsys):
+    code, out = run_healthcheck(capsys)
+    assert code == 1 and "no data yet" in out and "last successful run: never" in out
 
 
 # ----------------------------------------------------------------------------- dataset.py: reading back

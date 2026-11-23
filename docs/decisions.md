@@ -595,3 +595,49 @@ Both draw a forecast at the hour it is for, and break the line at every missing 
 shows it. To fix when `intervals.py` is next run.
 
 157 automated tests as of today (132 without a database, 25 against Postgres).
+
+## 2026-11-23 — a crashed run can no longer stay "running"; latency measured again
+
+**The gap** (written down on 19 Nov). `run_ingest` only caught OpenAQ's refusals. Anything else, a bug,
+an answer in a new shape or a database error, killed the job after `start_run` had written the row.
+The row then said `running` for ever, and `finish_run`'s own rule ("always call this, including on
+failure") was not kept.
+
+**The fix** (`record_crash` in `ingest.py`). On any other error the job now rolls back, closes the row
+as `failed` with `crashed: <the error>`, and raises the same error again, so the job still turns red.
+The rollback has to come first: after a failed statement Postgres refuses everything else in that
+transaction. If the row cannot be closed either, because the database itself is gone, that is logged
+and the first error is still the one raised.
+
+- **Stop loudly, do not skip.** An OpenAQ refusal is the source's problem, so that sensor is skipped
+  and the run goes on. Anything else is our problem, and a job that carried on would turn a bug into
+  quietly missing data.
+- **Still not covered.** A job killed from outside (cancelled, out of time) cannot write anything, so
+  its row stays `running`. `healthcheck.py` shows such rows under "runs in last 24h".
+
+**Tests first.** Four tests in `tests/test_db_integration.py`. Three of them failed on the old code in
+exactly this way: the row said `running`, and after a database error the connection refused every
+further statement. They also fail if the rollback is removed, if the error is swallowed, or if a
+failing recorder hides the first error. Before pushing, one real run by hand: 13 sensors, 52 rows
+seen, 0 new, status ok.
+
+**`healthcheck.py` is tested too** (six tests, coverage 12% → 98%): green; their data late is green
+with a warning; red after 12 hours without a successful run; a failed run does not count as alive and
+its error is shown; a partial run counts; an empty database is red and not a crash.
+
+**Numbers.** 167 tests: 132 without a database, 35 against Postgres. Coverage with the database
+61.4% (1,346 of 2,191 statements).
+
+**Latency, measured again** with the p95 corrected on 19 Nov (`results/latency_2026-11-23.csv`; from
+Pune, 30 requests per endpoint, 23 Nov 17:27 IST):
+
+| Endpoint | End to end, p50 | End to end, p95 | Server, answer in cache (p50) | Server, first request |
+|---|---|---|---|---|
+| `/` | 128 ms | 285 ms | 0.6 ms | 0.8 ms |
+| `/health` | 124 ms | 187 ms | 0.8 ms | 45.1 ms |
+| `/forecast` | 122 ms | 244 ms | 1.1 ms | 38.0 ms |
+| `/stats` | 125 ms | 211 ms | 0.8 ms | 61.7 ms |
+
+For the three data endpoints the first request is the one that asks the database; after it the answer
+is in the cache. Waking the free server from sleep took 17.5 s. These numbers replace the ones of 17
+and 18 Nov, whose p95 was the 28th of 30 values.

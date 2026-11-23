@@ -188,6 +188,10 @@ The current numbers are always at
 - **Least privilege.** The API connects with a database role that can only read.
 - **One image, tested as it is built.** The Docker build runs the API tests; if they fail there is no
   image.
+- **Measured with two clocks.** The server answers in about 1 ms when the answer is in its cache and in
+  38 to 62 ms when it asks the database. From Pune a request takes about 125 ms end to end, p95 under
+  290 ms ([results/latency_2026-11-23.csv](results/latency_2026-11-23.csv)). On free hosting the first
+  request after a quiet spell also waits for the server to wake: 17.5 seconds when measured.
 - **CI on every code push.** Lint, the whole test suite on Python 3.12 and 3.14 with a Postgres started
   for the job, a coverage floor, and the image build ([docs/testing.md](docs/testing.md)).
 - **A written trail.** Every decision is dated and explained in

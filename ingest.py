@@ -110,30 +110,61 @@ def active_sensors(conn, parameter="pm25"):
         return cur.fetchall()
 
 
-def run_ingest(conn, datetime_from, datetime_to, mode):
-    """Pull hourly data for every sensor in the window and save it."""
-    run_id = start_run(conn, source="openaq", mode=mode)
-    sensors = active_sensors(conn)
+def record_crash(conn, run_id, exc, sensors_tried, rows_fetched, rows_inserted):
+    """Close the row of a run that is about to die, so that it does not say 'running' for ever.
 
-    if not sensors:
+    The rollback comes first: after a failed statement Postgres refuses everything else in that
+    transaction. If even this fails (the database itself is gone), that is logged and swallowed, so the
+    error the caller raises again is the first one, the one that says what really happened.
+    """
+    try:
+        conn.rollback()
         finish_run(conn, run_id, "failed",
-                   error_text="No sensors in registry. Run with --discover first.")
-        log.error("no sensors registered. Run: python ingest.py --discover")
-        return 0, 0
+                   sensors_tried=sensors_tried,
+                   rows_fetched=rows_fetched,
+                   rows_inserted=rows_inserted,
+                   error_text=f"crashed: {type(exc).__name__}: {exc}"[:2000])
+        log.error("run %s crashed and is recorded as failed: %s: %s", run_id, type(exc).__name__, exc)
+    except Exception:
+        log.exception("run %s crashed, and the crash could not be recorded", run_id)
 
+
+def run_ingest(conn, datetime_from, datetime_to, mode):
+    """Pull hourly data for every sensor in the window and save it.
+
+    Whatever happens, the run's row in ingestion_runs is closed with a status:
+      * OpenAQ refuses a sensor   -> that sensor is skipped; the run ends 'partial', or 'failed' if all were
+      * anything else goes wrong  -> the run ends 'failed' with the reason, and the error travels on, so the
+                                     job turns red. (Until 23 Nov 2026 such a run stayed 'running' for ever.)
+    """
+    run_id = start_run(conn, source="openaq", mode=mode)
+    sensors = []
     total_fetched = total_inserted = 0
     failures = []
 
-    for sensor_id, station_name in sensors:
-        try:
-            for payload in iter_sensor_hours(sensor_id, datetime_from, datetime_to):
-                rows = flatten_hours(payload, sensor_id)
-                total_fetched += len(rows)
-                total_inserted += insert_measurements(conn, rows)
-        except OpenAQError as exc:
-            # One dead sensor must not kill the whole run. Log it, carry on.
-            failures.append(f"sensor {sensor_id} ({station_name}): {exc}")
-            log.warning("sensor %s failed: %s", sensor_id, exc)
+    try:
+        sensors = active_sensors(conn)
+
+        if not sensors:
+            finish_run(conn, run_id, "failed",
+                       error_text="No sensors in registry. Run with --discover first.")
+            log.error("no sensors registered. Run: python ingest.py --discover")
+            return 0, 0
+
+        for sensor_id, station_name in sensors:
+            try:
+                for payload in iter_sensor_hours(sensor_id, datetime_from, datetime_to):
+                    rows = flatten_hours(payload, sensor_id)
+                    total_fetched += len(rows)
+                    total_inserted += insert_measurements(conn, rows)
+            except OpenAQError as exc:
+                # One dead sensor must not kill the whole run. Log it, carry on.
+                failures.append(f"sensor {sensor_id} ({station_name}): {exc}")
+                log.warning("sensor %s failed: %s", sensor_id, exc)
+    except Exception as exc:
+        # Not an OpenAQ refusal: a bug, an answer in a new shape, or the database. Stop, loudly.
+        record_crash(conn, run_id, exc, len(sensors), total_fetched, total_inserted)
+        raise
 
     status = "ok" if not failures else ("failed" if len(failures) == len(sensors) else "partial")
     finish_run(conn, run_id, status,
