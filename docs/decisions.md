@@ -641,3 +641,83 @@ Pune, 30 requests per endpoint, 23 Nov 17:27 IST):
 For the three data endpoints the first request is the one that asks the database; after it the answer
 is in the cache. Waking the free server from sleep took 17.5 s. These numbers replace the ones of 17
 and 18 Nov, whose p95 was the 28th of 30 values.
+
+## 2026-11-24 — why the ridge loses in bad air and in winter
+
+**The question.** Step 8 found where the ridge loses to "same as now": in the hours above 90 µg/m³
+(27.47 against 22.99 in the frozen run) and in the winter window (16.27 against 15.98). It did not say
+why. My guess in the week-4 notes: the ridge pulls high values back towards the usual level, and in a
+long bad spell "same as now" is closer.
+
+**What was done.** `error_direction.py` takes the same 5,532 test forecasts (its first line repeats
+Step 8's 8.60 against 9.31) and looks at which way the errors go. Bias is forecast minus actual, so a
+negative bias means the forecasts ran low. Four tables in `results/error_direction.csv`; the sorting
+is tested in `tests/test_error_direction.py`.
+
+**1. How the hours are sorted decides the answer.** The band of 90 µg/m³ and more, sorted two ways:
+
+| Sorted by | Hours | Reading at the time | Ridge forecast | Actual a day later | Ridge MAE | Persistence MAE |
+|---|---|---|---|---|---|---|
+| what came (Step 8's way) | 253 | 92.4 | 82.3 | 108.4 | 27.5 | **23.0** |
+| what was known when the forecast was made | 250 | 106.3 | 91.2 | 95.5 | **18.5** | 21.6 |
+
+Picking hours by how they turned out makes every forecaster look too low on the high ones, because
+nobody knows in advance which hours will be the extreme ones. Persistence is too low there as well
+(bias -16.0; the ridge -26.2). Sorted by what was known at the time, the ridge wins in all four bands,
+bad air included.
+
+**2. The ridge pulls every forecast back towards the usual level, and that is a bet.** In bad air the
+reading is 106 on average and the forecast 91: the ridge expects bad air to ease. On average it does
+(95.5), so over the 250 forecasts made in bad air the bet pays. The 253 hours that turned out bad are
+the ones where it did not:
+
+| A day earlier the air was | Hours | Reading then | Ridge forecast | Actual | Ridge MAE | Persistence MAE |
+|---|---|---|---|---|---|---|
+| already at 90 or more: a bad spell going on | 148 | 107.4 | 92.9 | 110.6 | 19.9 | **15.1** |
+| still under 90: a bad spell arriving | 105 | 71.3 | 67.3 | 105.4 | 38.1 | **34.1** |
+
+- A spell going on: the bet is lost and "same as now" is right. These hours make up about 63% of
+  Step 8's gap in bad air.
+- A spell arriving: neither sees it. All 105 forecasts of both were too low, by 34 to 38 on average.
+  The ridge is 4 worse because it had also expected a small fall.
+- The other side of the bet, worked out from the two tables above and not printed by the script: of
+  the 250 forecasts made in bad air, 148 were followed by bad air and 102 were not. In those 102 hours
+  the ridge's MAE is about 16.5 and persistence's about 31. So the bet is lost by about 5 six times in
+  ten, and won by about 15 four times in ten.
+
+**3. Winter is a second, separate thing.** In the winter window the ridge ran about 5 µg/m³ low at
+every starting level: bias -5.4, -6.0, -5.0 and -4.5 in the four bands (843 hours). Worked out from
+the tables, outside that window its bias is within about 1 µg/m³ of zero in the three lower bands
+(the fourth has only 32 hours there). An error of the same size at every level is what a wrong idea of
+the usual level looks like. The model of that window had been trained on late February to early
+December 2025, so this is the only test window whose time of year was entirely new to the model.
+That is the likely reason. It is not proven.
+
+**What my guess got right, and what it missed.** Right: the ridge pulls high values back, and in a
+spell that goes on "same as now" is closer. Missed: the pull-back is not a fault, it is why the ridge
+wins on average. 105 of the 253 bad hours were not a long spell at all but one arriving. And "mostly
+on the low side" proves little for hours picked by how they turned out: persistence is low there too.
+
+**Decided.**
+
+- The live model does not change.
+- Not done, on purpose: switching to "same as now" whenever the air is bad. It sounds like the fix, and
+  it would make the forecasts worse: in those 250 hours persistence scores 21.6 against the ridge's 18.5.
+- The README section "Where it loses" now says why. Its bad-air line now says "the hours that turned
+  out at 90 or more", which is what Step 8 measured.
+
+**Still open.**
+
+- What would help with a spell arriving is information from outside the station's own past: weather,
+  the stations upwind, the dates of festivals. None of that is in this model.
+- Winter. v2, the live model, has last winter in its training data. If the live forecasts of December
+  and January still run low by about as much, "first winter" was not the reason. So far the live bias
+  is -3.9 (13 to 24 Nov, 251 hours), with single days between -23.5 and +19.8: too few days to say.
+- Not measured yet: how much of the 0.3 winter gap the offset of 5 explains, and how the 80% band does
+  when the hours are sorted by what was known. The 46% in the README is sorted by what came.
+
+**The same day, live.** Tue 24 Nov, the first 16 scored hours: actual 94.5 on average, forecast 71.3,
+MAE 33.4 against 33.7 for persistence, 5 of 16 inside the band. A bad day arriving, and neither saw
+it. Coverage of v2's full tier went from 0.743 to 0.725 (251 hours).
+
+171 automated tests as of today (136 without a database, 35 against Postgres).

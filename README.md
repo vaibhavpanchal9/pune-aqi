@@ -15,7 +15,7 @@ spell can take up to a minute)
 | **Model** | Ridge regression on the station's own past: lags, rolling means, time of day and season. 24 hours ahead, with an 80% band. |
 | **Accuracy** | 7.3% better than "same as now" over 48 test weeks (MAE 8.91 against 9.61 µg/m³). The 80% band held 81% of the actuals. |
 | **Live record** | Each forecast is written once and scored when the actual arrives. The running record is public at `/stats`. |
-| **Engineering** | PostgreSQL, FastAPI, Docker, CI on every code push, more than 150 automated tests, 25 of them against a real Postgres. |
+| **Engineering** | PostgreSQL, FastAPI, Docker, CI on every code push, about 170 automated tests, 35 of them against a real Postgres. |
 
 Where the model loses is in this README too: [Where it loses](#where-it-loses).
 
@@ -54,9 +54,10 @@ Every field is described in [docs/api.md](docs/api.md).
 
 ## Results
 
-Every number in this section comes from one run on one frozen data file
-([results/frozen_run_2026-11-11.txt](results/frozen_run_2026-11-11.txt)): 10,225 usable hours of the
-Panchawati_Pashan station through 11 November 2026.
+Every number in this section comes from one frozen data file: 10,225 usable hours of the
+Panchawati_Pashan station through 11 November 2026. The run of all eight evaluation scripts on it is
+kept whole in [results/frozen_run_2026-11-11.txt](results/frozen_run_2026-11-11.txt), and the later
+checks use the same file.
 
 **How it was tested.** Walk-forward: train on everything before a window, test on the next 8 weeks,
 six times over, with a 24-hour gap between the two. That is 48 weeks, 11 December 2025 to
@@ -144,9 +145,10 @@ against 9.08, and 10.15 against 10.67).
 
 - **Winter.** In the winter test window the ridge does not beat persistence (16.27 against 15.98), and
   in January it loses.
-- **Bad-air hours.** Above 90 µg/m³ the ridge is worse than persistence (27.47 against 22.99), and the
-  80% band holds only 46% of the actuals. These are 253 of the 5,532 test hours, 4.6%, and they are
-  the hours people care about most ([results/error_analysis.csv](results/error_analysis.csv)).
+- **Bad-air hours.** In the hours that turned out at 90 µg/m³ or more, the ridge is worse than
+  persistence (27.47 against 22.99), and the 80% band holds only 46% of the actuals. These are 253 of
+  the 5,532 test hours, 4.6%, and they are the hours people care about most
+  ([results/error_analysis.csv](results/error_analysis.csv)).
 - **No weather.** The model sees only past PM2.5 and the calendar. When the level jumps or drops from
   one day to the next, it cannot see that coming.
 - **One station.** 13 stations are collected; one is modelled.
@@ -160,6 +162,22 @@ and that is a day too late. The breaks are real holes: only 62 of that week's 16
 forecast and a reading.
 
 ![Diwali week: the forecast a day ahead and what was measured](figures/forecast_diwali.png)
+
+**Why it loses there.** The model bets that bad air will ease. After a reading of 90 µg/m³ or more
+(106 on average) it forecasts 91, and the next day came in at 95.5. Over all 250 forecasts made in bad
+air the bet pays: MAE 18.5 against 21.6 for persistence. It fails in the hours that turn out bad
+([results/error_direction.csv](results/error_direction.csv)):
+
+| The 253 hours that turned out at 90 µg/m³ or more | Hours | Ridge MAE | Persistence MAE |
+|---|---|---|---|
+| Already at 90 or more a day earlier: a bad spell going on | 148 | 19.9 | **15.1** |
+| Still under 90 a day earlier: a bad spell arriving | 105 | 38.1 | **34.1** |
+
+When a spell goes on, "same as now" is right and the bet is lost. When one arrives, neither sees it
+coming: all 105 forecasts were too low, from both. Winter is a second problem. In that test window the
+ridge ran about 5 µg/m³ low whatever level it started from. The likely reason: it was the model's first
+winter. Its training data ran from late February to early December, so this is the only test window
+whose time of year was entirely new to the model.
 
 ## The live record
 
@@ -226,7 +244,7 @@ The API with a local Postgres in Docker: [docs/docker.md](docs/docker.md). The d
 |---|---|
 | Collect | `openaq_client.py`, `transform.py`, `ingest.py`, `backfill.py`, `db.py`, `schema.sql`, `healthcheck.py` |
 | Know the data | `quality_report.py`, `audit_sensors.py`, `runsql.py`, `sql/` |
-| Build and judge models | `dataset.py`, `splits.py`, `baselines.py`, `evaluate.py`, `train.py`, `error_analysis.py`, `intervals.py`, `tiers.py`, `band_calibration.py`, `band_weekly.py` |
+| Build and judge models | `dataset.py`, `splits.py`, `baselines.py`, `evaluate.py`, `train.py`, `error_analysis.py`, `intervals.py`, `tiers.py`, `band_calibration.py`, `band_weekly.py`, `error_direction.py` |
 | Ship the model | `fit_model.py`, `modelfile.py`, `models/`, `forecast.py` |
 | Serve | `service.py`, `app.py`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `make_readonly_role.py`, `seed_local.py`, `bench.py` |
 | Check | `tests/`, `.github/workflows/ci.yml` |
