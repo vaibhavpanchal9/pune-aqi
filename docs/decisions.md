@@ -804,3 +804,38 @@ of 23 actuals inside the band. Today the bad air was in the model's inputs: 16 h
 (274 hours).
 
 175 automated tests as of today (140 without a database, 35 against Postgres).
+
+## 2026-11-25 — the band script: the summary line fixed at the source, the old picture removed
+
+**The summary line.** For the bad-air hours, `intervals.py` printed the plain average of the folds'
+shares next to the total number of hours: "0.463 ... 253". The entry above shows how that was misread.
+The folds are far from equal (`results/intervals.csv`, the band that is used):
+
+| Test window | Bad-air hours | Inside the band |
+|---|---|---|
+| 1 (winter) | 226 | 0.788 |
+| 2 | 8 | 0.875 |
+| 3 | 3 | 0.000 |
+| 4 | 0 | |
+| 5 | 0 | |
+| 6 | 16 | 0.188 |
+| All | 253 | 0.743 |
+
+Three hours in window 3 weighed as much as 226 in winter. The summary row now holds the share over
+all bad-air hours: 0.743 for the band that is used, and 0.557 and 0.553 for the two that were not
+chosen (they read 0.367 and 0.395). The script now prints the hours of each fold next to its share.
+
+- Nothing else in `results/intervals.csv` changed. Before the commit a check compared the new file
+  with the one in git cell by cell, on the frozen data file.
+- `coverage` and `width` in the summary row are still the mean of the six folds, as everywhere in
+  this project. For coverage that is 0.814, and 0.812 over all hours.
+- The log of the frozen run (`results/frozen_run_2026-11-11.txt`) still shows the old line. It is the
+  record of what was printed on 21 Nov and stays as it is.
+
+**The picture.** `figures/intervals.png` and the function that drew it are removed. The picture was
+wrong in three ways (22 Nov), nothing showed it any more, and `readme_figures.py` draws the same band
+correctly.
+
+**Tests.** Three new ones in `tests/test_coverage.py`, written first. The first failed on the old
+code: two folds with shares of 0.8 (10 hours) and 0.0 (2 hours) gave 0.4, and now give 8 of 12.
+178 automated tests as of today (143 without a database, 35 against Postgres).

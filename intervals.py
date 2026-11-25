@@ -1,6 +1,6 @@
 """Step 9. Prediction intervals: not just "8.56", but "and here is the range".
 
-    python intervals.py           # -> results/intervals.csv, figures/intervals.png
+    python intervals.py           # -> results/intervals.csv
 
 A point forecast of 45 µg/m³ is more useful with an honest band around it: "between 30 and 70, eight
 times out of ten". Three ways to get an 80% band (10th to 90th percentile), all judged the same way:
@@ -19,7 +19,11 @@ Judged by two numbers on the six walk-forward folds:
   coverage  share of actual values that fell inside the band. Target 0.80. Above = honest but wide;
             below = overconfident. Both matter.
   width     mean (upper - lower). Narrower is better *only if* coverage holds.
-Plus coverage inside the "Poor or worse" hours, because that is where a band earns its keep.
+Plus coverage inside the "Poor or worse" hours (actual above 90), because that is where a band earns its
+keep. The folds have very different numbers of such hours, and some have none, so in the summary this is
+the share over ALL of them and not the mean of the folds (see evaluate_intervals).
+
+The pictures of the band are drawn by readme_figures.py.
 """
 
 import argparse
@@ -39,6 +43,7 @@ from train import make_ridge
 TARGET = "y"
 ALPHA = 0.20                   # 80% band: quantiles ALPHA/2 and 1 - ALPHA/2
 CAL_WEEKS = 8                  # the tail of the training window used to measure errors
+POOR = 90                      # µg/m³: an hour is "Poor or worse" when the actual is above this
 
 
 def split_calibration(train, weeks=CAL_WEEKS):
@@ -86,39 +91,33 @@ def coverage(y, lo, hi):
 
 
 def evaluate_intervals(method, features, folds, cols):
+    """(table, frame). The table has one row per fold and then one summary row, fold = "mean".
+
+    In the summary row, coverage and width are the mean of the folds, and n and n_poor_plus are totals.
+    coverage_poor_plus is the share over all bad-air hours of all folds. It is NOT the mean of the folds:
+    one fold can have two hundred such hours and another three, and a plain mean lets the three weigh as
+    much as the two hundred. Until 25 Nov 2026 this was that plain mean, printed next to the total, and it
+    was read as a share of the total.
+
+    The frame has every test row: y, point, lower, upper, fold."""
     rows, frames = [], []
     for i, (tr_idx, te_idx) in enumerate(folds, start=1):
         train, test = features.loc[tr_idx], features.loc[te_idx]
         point, lo, hi = method(train, test.drop(columns=[TARGET]), cols)
         y = test[TARGET]
-        poor = y > 90
+        poor = y > POOR
         rows.append({"fold": i, "n": len(y), "coverage": coverage(y, lo, hi),
                      "width": float((hi - lo).mean()),
                      "coverage_poor_plus": coverage(y[poor], lo[poor], hi[poor]) if poor.any() else np.nan,
                      "n_poor_plus": int(poor.sum())})
         frames.append(pd.DataFrame({"y": y, "point": point, "lower": lo, "upper": hi, "fold": i}))
-    out = pd.DataFrame(rows)
+    out, every = pd.DataFrame(rows), pd.concat(frames)
+    poor = every["y"] > POOR
     mean = {"fold": "mean", "n": int(out["n"].sum()), "coverage": out["coverage"].mean(),
-            "width": out["width"].mean(), "coverage_poor_plus": out["coverage_poor_plus"].mean(),
+            "width": out["width"].mean(),
+            "coverage_poor_plus": coverage(every["y"][poor], every["lower"][poor], every["upper"][poor]),
             "n_poor_plus": int(out["n_poor_plus"].sum())}
-    return pd.concat([out, pd.DataFrame([mean])], ignore_index=True), pd.concat(frames)
-
-
-def plot_band(frame, path, days=14):
-    """The last `days` days of out-of-sample forecasts for one method: band, point, actual."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    f = frame.sort_index().iloc[-24 * days:]
-    fig, ax = plt.subplots(figsize=(11, 4))
-    ax.fill_between(f.index, f["lower"], f["upper"], color="#2E6F9E", alpha=0.2, label="80% band")
-    ax.plot(f.index, f["point"], color="#2E6F9E", lw=1.2, label="forecast (24 h ahead)")
-    ax.plot(f.index, f["y"], color="#172029", lw=1.0, label="actual")
-    ax.set_ylabel("PM2.5, µg/m³"); ax.set_title(f"Out-of-sample forecasts with an 80% band, last {days} days of fold 6")
-    ax.legend(loc="upper left"); ax.grid(alpha=0.3)
-    fig.autofmt_xdate(); fig.tight_layout()
-    Path(path).parent.mkdir(exist_ok=True)
-    fig.savefig(path, dpi=130); plt.close(fig)
+    return pd.concat([out, pd.DataFrame([mean])], ignore_index=True), every
 
 
 def main():
@@ -130,13 +129,12 @@ def main():
     folds = walk_forward(f.index)
     cols = feature_columns(f)
 
-    results, frames = [], {}
+    results = []
     for name, method in METHODS.items():
         print(f"evaluating {name} ...", flush=True)
-        table, frame = evaluate_intervals(method, f, folds, cols)
+        table, _ = evaluate_intervals(method, f, folds, cols)
         table.insert(0, "method", name)
         results.append(table)
-        frames[name] = frame
 
     Path("results").mkdir(exist_ok=True)
     allres = pd.concat(results, ignore_index=True)
@@ -145,12 +143,21 @@ def main():
     pd.set_option("display.width", 160)
     print(f"\nsensor {args.sensor} · nominal coverage {1 - ALPHA:.0%} · {len(folds)} folds\n")
     means = allres[allres["fold"] == "mean"].set_index("method")
-    print(means[["coverage", "width", "coverage_poor_plus", "n_poor_plus"]].round(3).to_string())
+    folds_only = allres[allres["fold"] != "mean"]
+    print("mean of the folds:")
+    print(means[["coverage", "width"]].round(3).to_string())
     print("\nper fold:")
-    print(allres[allres["fold"] != "mean"].pivot(index="fold", columns="method", values="coverage").round(3).to_string())
+    print(folds_only.pivot(index="fold", columns="method", values="coverage").round(3).to_string())
+
+    # bad-air hours: how many each fold has is printed with the shares, and the last column is all of them
+    hours = folds_only[folds_only["method"] == next(iter(METHODS))].set_index("fold")["n_poor_plus"]
+    poor = folds_only.pivot(index="method", columns="fold", values="coverage_poor_plus").loc[list(METHODS)]
+    poor.columns = [f"fold {k} ({hours[k]} h)" for k in poor.columns]
+    poor[f"all ({int(hours.sum())} h)"] = means["coverage_poor_plus"]
+    print(f"\nbad-air hours (actual above {POOR}): share inside the band, in each fold and over all of them")
+    print(poor.round(3).to_string())
 
     # pick: closest to nominal coverage; ties broken by width
-    folds_only = allres[allres["fold"] != "mean"]
     fold_miss = folds_only.assign(miss=(folds_only["coverage"] - (1 - ALPHA)).abs()).groupby("method")["miss"].mean()
     means = means.assign(fold_miss=fold_miss)
     honest = means[means["coverage"] >= (1 - ALPHA) - 0.02]        # not systematically overconfident
@@ -158,8 +165,7 @@ def main():
     print(f"\nmean coverage and fold-to-fold miss:\n{means[['coverage', 'width', 'fold_miss']].round(3).to_string()}")
     print(f"\npick: {best}  (coverage {means.loc[best, 'coverage']:.3f}, worst fold "
           f"{folds_only[folds_only['method'] == best]['coverage'].min():.3f}, width {means.loc[best, 'width']:.1f})")
-    plot_band(frames[best], "figures/intervals.png")
-    print("written: results/intervals.csv, figures/intervals.png")
+    print("written: results/intervals.csv")
 
 
 if __name__ == "__main__":
