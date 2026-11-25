@@ -721,3 +721,86 @@ MAE 33.4 against 33.7 for persistence, 5 of 16 inside the band. A bad day arrivi
 it. Coverage of v2's full tier went from 0.743 to 0.725 (251 hours).
 
 171 automated tests as of today (136 without a database, 35 against Postgres).
+
+## 2026-11-25 — a wrong number in the README, and three checks on why the ridge loses
+
+**What was done.** `error_direction.py` now prints seven tables instead of four, and one more column:
+the share of actuals inside the 80% band. Yesterday's entry left two things "not measured yet" and
+worked two numbers out by hand. The script now measures all of it (8 tests). Its output agrees with
+the earlier steps where it must: 8.60 against 9.31 (Step 8), and the band's share in each of the six
+test windows is Step 9's to three decimals (0.823, 0.775, 0.721, 0.847, 0.871, 0.847).
+
+**1. A number in the README was wrong.** It said the 80% band "holds only 46%" of the actuals in the
+253 bad-air hours. It holds 74% of them (0.743, which is 188 of 253).
+
+- Where the 46% came from. `intervals.py` (7 Nov) scores the bad-air hours of each test window on
+  their own, and its summary line takes the plain average of those shares: 0.463. A window with a few
+  bad hours counts as much as the winter window, which has most of the bad air (218 of the 250
+  forecasts made in bad air). The line prints that average next to the total of 253 hours, and I read
+  it as "46% of 253".
+- It made the band look worse than it is. No decision was based on it, and nothing live changes.
+- The headline 0.814 is the same kind of average. There it hardly matters, because the six windows
+  are of similar size: over all 5,532 hours the share is 0.812.
+- Corrected in the README today. The entries of 21 and 24 Nov quote the 46% and stay as written.
+- Still to do: `intervals.py` should print the share over all bad-air hours, so that the line cannot
+  be misread again.
+
+**2. The band is too wide in bad air. It fails when bad air arrives.** Sorted by the level when the
+forecast was made, the share of actuals inside the band is 0.789 (under 30), 0.817, 0.879 and 0.940
+(90 or more), against a target of 0.80. The band is a share of the forecast, so it grows with the
+forecast, and the errors do not grow as fast: the ridge's MAE is 30% of its forecast under 30 and 20%
+at 90 or more. Sorted by what came, the 253 bad hours are 148 where the air was already bad (0.926
+inside) and 105 where it was not yet (0.486 inside). So the band does not fail "in bad air". It fails
+when bad air arrives, like the forecast itself.
+
+**3. The other side of the bet, now printed** (table 5). Of the 250 forecasts made in bad air:
+
+| A day later the air | Hours | Ridge forecast | Actual | Ridge MAE | Persistence MAE |
+|---|---|---|---|---|---|
+| was still at 90 or more | 148 | 92.9 | 110.6 | 19.9 | **15.1** |
+| was back under 90 | 102 | 88.7 | 73.7 | **16.4** | 31.1 |
+
+Yesterday's arithmetic said about 16.5 and about 31.
+
+**4. Winter: the offset accounts for the loss. Why it is there is not settled.** Bias is forecast
+minus actual. The last two columns are the MAE with each window's own average error taken out:
+
+| Test window | Ridge bias | Persistence bias | Ridge MAE | Persistence MAE | Ridge, offset out | Persistence, offset out |
+|---|---|---|---|---|---|---|
+| 1 (winter) | -5.2 | -0.8 | 16.3 | **16.0** | 15.9 | 16.0 |
+| 2 | +2.6 | +1.2 | **9.8** | 10.7 | 9.6 | 10.7 |
+| 3 | +0.5 | +0.7 | **8.6** | 9.8 | 8.5 | 9.8 |
+| 4 | -1.6 | 0.0 | **4.7** | 5.2 | 4.6 | 5.2 |
+| 5 | -0.3 | -0.3 | **4.5** | 5.3 | 4.5 | 5.3 |
+| 6 | -4.4 | -2.8 | **9.7** | 10.7 | 9.5 | 10.6 |
+
+- With its average error taken out, the ridge is level with persistence in winter (15.9 against
+  16.0). The offset accounts for the whole loss. It does not give the ridge the lead it has in the
+  other five windows.
+- Taking an average error out uses the outcomes, so nobody could have made those forecasts. It is a
+  measurement, not a fix.
+- Yesterday I called "its first winter" the likely reason. This table does not support "likely".
+  Window 6 is a time of year the model had seen, and it ran 4.4 low as well. Part of that is the level
+  rising through the window, which makes "same as now" run low too (-2.8, against -0.8 in winter). So
+  "first winter" is one possible reason, and the README now says it is not settled.
+
+**Decided.**
+
+- README: 46% becomes 74%. "Why it loses there" has the three cases in one table, with the band. The
+  band section says the band is too wide in bad air. The winter lines say what is measured and what is
+  not settled.
+- The live model does not change.
+
+**Still open.**
+
+- `intervals.py`: the summary line for bad-air hours (above), and its picture (22 Nov).
+- Winter: the live record of December and January. v2 has last winter in its training data.
+- The band could be narrower in bad air. Not touched now: a change to the band goes through the same
+  kind of test as on 19 Nov, with the rule written down before the numbers.
+
+**The same days, live.** Yesterday's bad day ended at MAE 25.2 against 27.0 for persistence, with 11
+of 23 actuals inside the band. Today the bad air was in the model's inputs: 16 hours so far, forecast
+87.4 on average, actual 85.6, MAE 7.4 against 14.9, 15 of 16 inside. Coverage of v2's full tier: 0.741
+(274 hours).
+
+175 automated tests as of today (140 without a database, 35 against Postgres).

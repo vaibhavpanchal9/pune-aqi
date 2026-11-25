@@ -113,11 +113,14 @@ was chosen by a rule and not by eye: the most recent 14 days in which at least 8
 forecast. On it the MAE is 7.51 against 8.21 for persistence, and 77% of the actuals are inside the
 band. A break in a line is an hour with no forecast or no reading.
 
-Two later checks, both kept in the repo:
+Three later checks, all kept in the repo:
 
 - **Would sizing the band from more recent errors be better?** Eight ways were compared under a rule
   written down before the numbers were seen. None earned a switch
   ([results/band_calibration.csv](results/band_calibration.csv)).
+- **Is the band the right width at every level?** No. It is a share of the forecast, and in bad air
+  that makes it wider than it needs to be. Of the forecasts made at 90 µg/m³ or more it held 94% of
+  the actuals; of those made under 30, 79% ([results/error_direction.csv](results/error_direction.csv)).
 - **How far can one week stray?** Over the year the band holds 0.81, but 5 of 36 single test weeks
   were under 0.70, and 1 of 19 fortnights ([results/band_weekly.csv](results/band_weekly.csv)).
 
@@ -146,9 +149,9 @@ against 9.08, and 10.15 against 10.67).
 - **Winter.** In the winter test window the ridge does not beat persistence (16.27 against 15.98), and
   in January it loses.
 - **Bad-air hours.** In the hours that turned out at 90 µg/m³ or more, the ridge is worse than
-  persistence (27.47 against 22.99), and the 80% band holds only 46% of the actuals. These are 253 of
-  the 5,532 test hours, 4.6%, and they are the hours people care about most
-  ([results/error_analysis.csv](results/error_analysis.csv)).
+  persistence (27.47 against 22.99, [results/error_analysis.csv](results/error_analysis.csv)), and the
+  80% band holds 74% of the actuals ([results/error_direction.csv](results/error_direction.csv)).
+  These are 253 of the 5,532 test hours, 4.6%, and they are the hours people care about most.
 - **No weather.** The model sees only past PM2.5 and the calendar. When the level jumps or drops from
   one day to the next, it cannot see that coming.
 - **One station.** 13 stations are collected; one is modelled.
@@ -164,20 +167,25 @@ forecast and a reading.
 ![Diwali week: the forecast a day ahead and what was measured](figures/forecast_diwali.png)
 
 **Why it loses there.** The model bets that bad air will ease. After a reading of 90 µg/m³ or more
-(106 on average) it forecasts 91, and the next day came in at 95.5. Over all 250 forecasts made in bad
-air the bet pays: MAE 18.5 against 21.6 for persistence. It fails in the hours that turn out bad
-([results/error_direction.csv](results/error_direction.csv)):
+(106 on average) it forecasts 91, and the next day came in at 95.5. With "bad" meaning 90 or more,
+three things can happen ([results/error_direction.csv](results/error_direction.csv)):
 
-| The 253 hours that turned out at 90 µg/m³ or more | Hours | Ridge MAE | Persistence MAE |
-|---|---|---|---|
-| Already at 90 or more a day earlier: a bad spell going on | 148 | 19.9 | **15.1** |
-| Still under 90 a day earlier: a bad spell arriving | 105 | 38.1 | **34.1** |
+| When the forecast was made → a day later | Hours | Ridge MAE | Persistence MAE | Actuals inside the 80% band |
+|---|---|---|---|---|
+| Bad air → cleared | 102 | **16.4** | 31.1 | 96% |
+| Bad air → still bad | 148 | 19.9 | **15.1** | 93% |
+| Not bad yet → bad air | 105 | 38.1 | **34.1** | 49% |
 
-When a spell goes on, "same as now" is right and the bet is lost. When one arrives, neither sees it
-coming: all 105 forecasts were too low, from both. Winter is a second problem. In that test window the
-ridge ran about 5 µg/m³ low whatever level it started from. The likely reason: it was the model's first
-winter. Its training data ran from late February to early December, so this is the only test window
-whose time of year was entirely new to the model.
+The first two rows are every forecast made in bad air, and over them the bet pays: 18.5 against 21.6.
+The last two are the hours that turned out bad, and over them it does not: 27.5 against 23.0. When a
+bad spell arrives, neither forecaster sees it coming: all 105 forecasts were too low, from both, and
+half of the actuals were above the band.
+
+Winter is a second problem. In that test window the ridge ran about 5 µg/m³ low whatever level it
+started from. With that average error taken out it is level with persistence (15.9 against 16.0), so
+the offset accounts for the whole loss. It was the model's first winter, and that may be the reason:
+the training data ran from late February to early December. But the autumn window, a time of year the
+model had seen, ran 4 low as well, so this is not settled.
 
 ## The live record
 
