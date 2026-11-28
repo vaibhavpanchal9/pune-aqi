@@ -839,3 +839,67 @@ correctly.
 **Tests.** Three new ones in `tests/test_coverage.py`, written first. The first failed on the old
 code: two folds with shares of 0.8 (10 hours) and 0.0 (2 hours) gave 0.4, and now give 8 of 12.
 178 automated tests as of today (143 without a database, 35 against Postgres).
+
+## 2026-11-28 — a live page, and the API lets a web page read it
+
+**What was done.** The project now has a page a person can open:
+https://vaibhavpanchal9.github.io/pune-aqi/. It is one file, `docs/index.html`, served by GitHub
+Pages. The reader's browser asks the API its three questions (`/forecast`, `/stats`, `/health`) and
+the page draws the answers: the next day hour by hour with its range, the live record next to the
+test, where the model loses, and how it all runs. Every number on it comes from those answers.
+
+**Why.** Until today the only ways to look at the service were `curl` and the API's own documentation
+page. Someone who is not a programmer could not see what it does.
+
+**1. The API now lets other sites read it (CORS).** A browser lets a page read an answer from another
+address only if the answer says so. The page is on github.io and the API is on onrender.com, so
+without this the browser blocks every answer. `app.py` now adds `Access-Control-Allow-Origin: *`.
+
+- `*` means any site. That gives nothing away here: every answer was public already, and the API
+  takes no cookies and no logins, so there is no private session that another site could misuse.
+- Other sites may only read (GET). `Server-Timing` is exposed, so the page can show the server's time.
+- The other choice was to name only the page's own address. Not taken: on a public, read-only API it
+  protects nothing, and it would stop the page from working when it is opened as a file from a
+  laptop. That is the fallback if GitHub Pages is down.
+- Three new tests in `tests/test_api.py`. Two of them fail on yesterday's `app.py`, as they should.
+
+**2. The page is static, and apart from the API.** The API sleeps when nobody uses it and can take up
+to a minute to wake. If the API served the page itself, a visitor would look at an empty tab for
+that minute. GitHub Pages answers at once, so the page can say "waking the service" while it waits.
+It costs nothing and nothing has to be built.
+
+**3. One file, no libraries.** HTML, CSS and JavaScript in one file of about 115 kB. About 64 kB of
+that are two typefaces, Khand and Hind (SIL Open Font License; the licence text is inside the file).
+The page loads nothing from anywhere else, and its own script draws the chart.
+
+**4. A saved copy, never shown as live.** The file holds three real answers of the service (28 Nov,
+12:56 IST). They are shown only when the reader asks for them, and always under a banner that gives
+their date and says they are not live.
+
+**5. The page shows the weak sides too.** The live record as it is: today 72 of 100 readings inside a
+range built for 80, and a miss of 15.8 against 16.8 for "same as now". A section "Where it loses".
+And the fact that it covers one station.
+
+**The order.** On 26 Nov I planned the page for after the v1.0 tag. It goes in a day before the
+checkpoint instead, so that the building is finished this week: my end-semester exam is on
+15 December. The checkpoint stays on 29 Nov, as written on 20 Nov. Today's commit changes `app.py`,
+`tests/test_api.py`, `README.md` and files in `docs/`. It does not touch the job that writes the
+forecasts (`ingest.py`, `forecast.py`, `models/v2.json`), so it cannot change the record that is
+judged tomorrow.
+
+**Decided.**
+
+- The page is part of the project: linked from the README and described in `docs/api.md`,
+  `docs/deploy.md` and the runbook.
+- One tag, v1.0, tomorrow after the checkpoint.
+
+**Still open.**
+
+- Other stations. The page shows Pashan because only Pashan has a model. Every other station needs
+  its own model and the same test.
+- The page has no automated test in the repo. Before it went in it was run in a browser in each state:
+  live, waking, no answer, saved copy, no forecast on file, dark, phone width.
+- GitHub Pages serves the whole `docs/` folder, so every document there has a web address now. They
+  were public on GitHub already.
+
+181 automated tests as of today (146 without a database, 35 against Postgres).

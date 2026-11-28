@@ -165,3 +165,29 @@ def test_every_answer_says_how_long_the_server_took(client):
         header = client.get(path).headers["server-timing"]
         assert header.startswith("app;dur=")
         assert 0 <= float(header.split("dur=")[1]) < 5000
+
+
+# ---------------------------------------------------------------- a web page on another address may read the answers
+PAGE = "https://vaibhavpanchal9.github.io"            # where the live page is; any other address is answered the same
+
+
+def test_a_web_page_on_another_address_may_read_every_answer(client):
+    for path in ("/", "/health", "/forecast", "/stats", "/forecast?sensor_id=1"):     # the 404 too
+        headers = client.get(path, headers={"Origin": PAGE}).headers
+        assert headers["access-control-allow-origin"] == "*"                    # public data: any page may read it
+        assert headers["access-control-expose-headers"] == "Server-Timing"      # and may see the server's own time
+        assert headers["server-timing"].startswith("app;dur=")
+
+
+def test_another_address_may_only_read(client):
+    ask = {"Origin": PAGE, "Access-Control-Request-Method": "GET"}              # what a browser asks beforehand
+    allowed = client.options("/forecast", headers=ask)
+    assert allowed.status_code == 200 and allowed.headers["access-control-allow-methods"] == "GET"
+    for method in ("POST", "PUT", "DELETE"):
+        refused = client.options("/forecast", headers={**ask, "Access-Control-Request-Method": method})
+        assert refused.status_code == 400
+
+
+def test_no_cookies_or_logins_are_accepted_from_another_address(client):
+    headers = client.get("/health", headers={"Origin": PAGE}).headers
+    assert "access-control-allow-credentials" not in headers

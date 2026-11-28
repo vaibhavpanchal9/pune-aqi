@@ -22,6 +22,7 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import service
@@ -95,6 +96,14 @@ async def server_timing(request: Request, call_next):
     response = await call_next(request)
     response.headers["Server-Timing"] = f"app;dur={(time.perf_counter() - start) * 1000:.1f}"
     return response
+
+
+# ----------------------------------------------------------------------------- who may read the answers
+# A browser lets a web page read an answer from another address only if that answer says so (CORS).
+# The live page is on github.io and this service is on onrender.com, so every answer now says "any page
+# may read me". Nothing is given away: the answers are public already, and the service takes no cookies
+# and no logins. Only GET is offered, and the page may also read the Server-Timing header.
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], expose_headers=["Server-Timing"])
 
 
 # ----------------------------------------------------------------------------- routes

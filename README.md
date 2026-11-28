@@ -4,7 +4,10 @@
 
 Every hour this project collects PM2.5 readings from 13 air-quality stations around Pune, forecasts
 the next day for one of them with a range around each number, stores every forecast before the actual
-is known, and serves it through a public API.
+is known, and serves it through a public API and a live page.
+
+**Live page:** https://vaibhavpanchal9.github.io/pune-aqi/ (the next day hour by hour, the range around
+each number, and the record so far)
 
 **Live API:** https://pune-aqi-api.onrender.com/docs (free hosting: the first request after a quiet
 spell can take up to a minute)
@@ -14,8 +17,8 @@ spell can take up to a minute)
 | **Data** | 150,000+ hourly readings since February 2025 from 13 reference-grade stations (CPCB / MPCB / IITM), through OpenAQ. Collected every hour, unattended, since 26 October 2026. |
 | **Model** | Ridge regression on the station's own past: lags, rolling means, time of day and season. 24 hours ahead, with an 80% band. |
 | **Accuracy** | 7.3% better than "same as now" over 48 test weeks (MAE 8.91 against 9.61 µg/m³). The 80% band held 81% of the actuals. |
-| **Live record** | Each forecast is written once and scored when the actual arrives. The running record is public at `/stats`. |
-| **Engineering** | PostgreSQL, FastAPI, Docker, CI on every code push, about 170 automated tests, 35 of them against a real Postgres. |
+| **Live record** | Each forecast is written once and scored when the actual arrives. The running record is public at `/stats` and on the live page. |
+| **Engineering** | PostgreSQL, FastAPI, Docker, CI on every code push, about 180 automated tests, 35 of them against a real Postgres. |
 
 Where the model loses is in this README too: [Where it loses](#where-it-loses).
 
@@ -28,6 +31,7 @@ flowchart LR
     J -->|readings, forecasts,<br/>one row per run| D[("Postgres<br/>on Neon")]
     D -->|read-only role| A["FastAPI on Render<br/>Docker image"]
     A --> U["/forecast  /stats  /health"]
+    U -->|read by| P["Live page<br/>on GitHub Pages"]
 ```
 
 1. **Collect.** `ingest.py` asks OpenAQ for the last 72 hours of every station and saves what is new.
@@ -41,8 +45,12 @@ flowchart LR
 3. **Store.** A forecast is written once. A later run cannot change it, so the live accuracy is the
    accuracy of what was really said at the time.
 4. **Serve.** `app.py` reads the database through a role that can only read.
+5. **Show.** `docs/index.html` is a page on GitHub Pages. The reader's browser asks the API its three
+   questions, and the page draws the answers. It has no server of its own.
 
 ## Try it
+
+In a browser: the [live page](https://vaibhavpanchal9.github.io/pune-aqi/). From a terminal:
 
 ```bash
 curl https://pune-aqi-api.onrender.com/forecast    # the hours ahead: point, lower, upper, issued when
@@ -199,7 +207,7 @@ On 22 November 2026, for the model that has been live since 13 November:
   days when the level swung by about 20 µg/m³ held most of the misses.
 - **Availability:** a forecast for every hour of the last 7 days (168 of 168).
 
-The current numbers are always at
+The current numbers are always on the [live page](https://vaibhavpanchal9.github.io/pune-aqi/) and at
 [/stats](https://pune-aqi-api.onrender.com/stats). The reasoning behind each step is in
 [docs/decisions.md](docs/decisions.md).
 
@@ -218,6 +226,10 @@ The current numbers are always at
   38 to 62 ms when it asks the database. From Pune a request takes about 125 ms end to end, p95 under
   290 ms ([results/latency_2026-11-23.csv](results/latency_2026-11-23.csv)). On free hosting the first
   request after a quiet spell also waits for the server to wake: 17.5 seconds when measured.
+- **A page with no server.** The live page is one hand-written file with no libraries, served by GitHub
+  Pages. The API lets any web page read it, GET only: every answer is public already, and it takes no
+  cookies and no logins. While the API wakes up the page says so, and its saved copy of real answers
+  is always marked as saved.
 - **CI on every code push.** Lint, the whole test suite on Python 3.12 and 3.14 with a Postgres started
   for the job, a coverage floor, and the image build ([docs/testing.md](docs/testing.md)).
 - **A written trail.** Every decision is dated and explained in
@@ -255,6 +267,7 @@ The API with a local Postgres in Docker: [docs/docker.md](docs/docker.md). The d
 | Build and judge models | `dataset.py`, `splits.py`, `baselines.py`, `evaluate.py`, `train.py`, `error_analysis.py`, `intervals.py`, `tiers.py`, `band_calibration.py`, `band_weekly.py`, `error_direction.py` |
 | Ship the model | `fit_model.py`, `modelfile.py`, `models/`, `forecast.py` |
 | Serve | `service.py`, `app.py`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, `make_readonly_role.py`, `seed_local.py`, `bench.py` |
+| Show | `docs/index.html` (the live page) |
 | Check | `tests/`, `.github/workflows/ci.yml` |
 | Run on a schedule | `.github/workflows/ingest.yml` |
 | Record | `docs/`, `results/`, `figures/`, `readme_figures.py` |

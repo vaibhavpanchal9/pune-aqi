@@ -49,3 +49,18 @@ That measurement is why the header exists.
 
 **Cold start.** The free host sleeps after 15 minutes without traffic. The first request then took
 25 s, 18 s and 14 s on three occasions on 18 Nov. Open the address a minute before a demo.
+
+## The live page on GitHub Pages (28 Nov 2026)
+
+https://vaibhavpanchal9.github.io/pune-aqi/ is the file `docs/index.html`. GitHub Pages serves the `docs/`
+folder of the `main` branch (repository Settings > Pages > Deploy from a branch > `main`, `/docs`).
+
+- **Nothing is built.** The empty file `docs/.nojekyll` tells GitHub to serve the folder as it is. A push
+  that changes `docs/` is live a minute or two later ("pages build and deployment" under Actions).
+- **The page has no server.** The reader's browser asks the API on Render directly. That is why the API
+  allows other sites to read it ([api.md](api.md)).
+- **Page and API are apart on purpose.** The API sleeps when nobody uses it and can take up to a minute
+  to wake. The page is there at once, and says that the service is waking.
+- **Everything in `docs/` has a web address now.** These documents were public on GitHub already.
+- **Render ignores the page.** `docs/` is not in the build filter of `render.yaml`, so a change to the
+  page does not rebuild the API.

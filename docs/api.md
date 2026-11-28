@@ -94,3 +94,21 @@ quote until a few hundred hours have been scored.
   `walk_forward` is now the cascade's figure from results/tier_comparison.csv: MAE 8.59 against 9.36 for
   persistence on 6,822 hours.
 - The served model is the one named in modelfile.py, not a fixed v1 file.
+
+## Reading it from a web page (28 Nov 2026)
+
+A browser lets a page read an answer from another address only if the answer allows it. The rule is
+called CORS. Since 28 Nov every answer to a request from a web page carries
+`Access-Control-Allow-Origin: *`, so any page may read it. The
+[live page](https://vaibhavpanchal9.github.io/pune-aqi/) is the first one that does.
+
+- Nothing is given away. Every answer was public already, and the API takes no cookies and no logins.
+- Other sites may only read. A browser that asks first whether it may `POST` is told no (status 400).
+- `Server-Timing` is listed in `Access-Control-Expose-Headers`, so a page can show how long the server took.
+- A request without an `Origin` header, such as plain `curl`, gets no `Access-Control-Allow-Origin`.
+
+```bash
+curl -s -D - -o /dev/null -H "Origin: https://example.org" https://pune-aqi-api.onrender.com/health
+```
+
+The setting is one line in `app.py`. Three tests in `tests/test_api.py` hold it in place.

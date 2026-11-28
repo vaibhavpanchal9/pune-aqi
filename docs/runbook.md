@@ -108,3 +108,21 @@ a version name means one model forever, because rows in `forecasts` refer to it.
 `could not translate host name ... neon.tech` is the laptop's DNS, not Neon and not the pipeline (the
 cloud job kept running). Check: `nslookup <host> 8.8.8.8` answers while plain `nslookup <host>` says
 REFUSED. Fix: `sudo networksetup -setdnsservers Wi-Fi 1.1.1.1 8.8.8.8` (undo with `... Wi-Fi empty`).
+
+## The live page (added 28 Nov 2026)
+
+https://vaibhavpanchal9.github.io/pune-aqi/ is `docs/index.html`, served by GitHub Pages. It asks the API
+from the reader's browser.
+
+- **"Waking the service"** for up to a minute: normal on free hosting. Nothing to do.
+- **"The service did not answer"**: open https://pune-aqi-api.onrender.com/health in a new tab.
+  - It answers there: the browser is refusing the page. Check that the answer still allows other sites.
+    `curl -s -D - -o /dev/null -H "Origin: https://vaibhavpanchal9.github.io" https://pune-aqi-api.onrender.com/health`
+    must print `access-control-allow-origin: *`.
+  - It does not answer there either: the API is down. Render dashboard > pune-aqi-api > Logs.
+- **A banner at the top, "This is a saved copy"**: the page is showing answers stored inside the file,
+  not live ones. Press "Try the live service".
+- **A change to the page does not show**: Pages needs a minute or two, then reload. The runs are under
+  Actions, "pages build and deployment".
+- **GitHub Pages itself is down**: open `docs/index.html` from the disk in a browser. It works the same,
+  because the API lets any page read it.
