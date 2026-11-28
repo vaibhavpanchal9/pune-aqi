@@ -126,3 +126,7 @@ from the reader's browser.
   Actions, "pages build and deployment".
 - **GitHub Pages itself is down**: open `docs/index.html` from the disk in a browser. It works the same,
   because the API lets any page read it.
+- **The forecast shows, but the status line or the record is missing**: the browser stopped one of the
+  page's three requests. The last line under "How it runs" names the address. Content blockers do
+  this. On the page's first day Brave stopped `/health` (the rule `||onrender.com/health` in the
+  EasyPrivacy list), which is why the page asks `/status`.

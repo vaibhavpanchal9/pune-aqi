@@ -229,7 +229,8 @@ The current numbers are always on the [live page](https://vaibhavpanchal9.github
 - **A page with no server.** The live page is one hand-written file with no libraries, served by GitHub
   Pages. The API lets any web page read it, GET only: every answer is public already, and it takes no
   cookies and no logins. While the API wakes up the page says so, and its saved copy of real answers
-  is always marked as saved.
+  is always marked as saved. It asks `/status`, a second name for `/health`, because content blockers
+  stop a web page from asking any address that starts with `onrender.com/health`.
 - **CI on every code push.** Lint, the whole test suite on Python 3.12 and 3.14 with a Postgres started
   for the job, a coverage floor, and the image build ([docs/testing.md](docs/testing.md)).
 - **A written trail.** Every decision is dated and explained in

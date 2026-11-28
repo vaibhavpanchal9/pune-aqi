@@ -11,6 +11,8 @@
                      404 for a sensor without a model, 422 for a sensor_id that is not a number
     GET /stats       live accuracy so far (as issued, never revised) overall, per tier and per model
                      version, next to the walk-forward figures, plus lead time and availability
+    GET /status      the same answer as /health under a second name, for web pages: content blockers
+                     stop a page from asking onrender.com/health (see the route below)
 
 FastAPI validates the inputs and the outputs against the Pydantic models below, and writes the
 interactive documentation at /docs from them. service.py does the database work.
@@ -115,6 +117,18 @@ def root():
 
 @app.get("/health", response_model=HealthResponse)
 def health():
+    return service.health()
+
+
+@app.get("/status", response_model=HealthResponse, summary="The same answer as /health, for web pages")
+def status():
+    """The same answer as /health under a second name.
+
+    Content blockers stop a web page from asking any address that starts with onrender.com/health
+    (the EasyPrivacy list has the rule ||onrender.com/health; Brave and uBlock Origin use that list).
+    On its first day the live page could not read /health in Brave, so it asks here instead.
+    /health stays for curl and for monitors, which no blocker touches.
+    """
     return service.health()
 
 

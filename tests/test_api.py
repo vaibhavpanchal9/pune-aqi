@@ -74,6 +74,13 @@ def test_health_is_200_with_the_three_sections(client):
     assert body["pipeline"]["runs_last_24h"] == 27
 
 
+def test_status_is_the_same_answer_as_health(client):
+    # content blockers stop a web page from asking onrender.com/health, so the live page asks /status
+    r = client.get("/status")
+    assert r.status_code == 200 and r.json() == client.get("/health").json()
+    assert "/status" in client.get("/openapi.json").json()["paths"]
+
+
 def test_forecast_default_sensor_is_200_with_rows_and_lead_hours(client):
     r = client.get("/forecast")
     assert r.status_code == 200
@@ -172,7 +179,7 @@ PAGE = "https://vaibhavpanchal9.github.io"            # where the live page is; 
 
 
 def test_a_web_page_on_another_address_may_read_every_answer(client):
-    for path in ("/", "/health", "/forecast", "/stats", "/forecast?sensor_id=1"):     # the 404 too
+    for path in ("/", "/health", "/status", "/forecast", "/stats", "/forecast?sensor_id=1"):     # the 404 too
         headers = client.get(path, headers={"Origin": PAGE}).headers
         assert headers["access-control-allow-origin"] == "*"                    # public data: any page may read it
         assert headers["access-control-expose-headers"] == "Server-Timing"      # and may see the server's own time

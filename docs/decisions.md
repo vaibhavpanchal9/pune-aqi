@@ -903,3 +903,41 @@ judged tomorrow.
   were public on GitHub already.
 
 181 automated tests as of today (146 without a database, 35 against Postgres).
+
+## 2026-11-28 (2) — the page did not work in Brave: a content blocker stopped /health
+
+**What happened.** A few minutes after the page went live I opened it in my own browser, Brave. It
+said "The service did not answer". At the same time `curl` showed the service answering, with the
+new header that lets a page read it.
+
+**The cause.** Brave has a content blocker built in, and it uses a public list called EasyPrivacy.
+That list has the rule `||onrender.com/health`: stop every request to an address that starts with
+`onrender.com/health`. The page asked three addresses at once (`/health`, `/stats`, `/forecast`) and
+waited for all three. One never left the browser, so the page gave up, and its message blamed the
+service.
+
+**How it was found.** Brave's icon showed one blocked request. The lists that Brave and uBlock Origin
+use (EasyList, EasyPrivacy, uBlock's own lists, Brave's own lists) were downloaded, and the three
+addresses were run through them with a filter library. `/health` is stopped by that one rule; `/stats`
+and `/forecast` pass. The same rule also stops `/healthz` and `/health-check`.
+
+**Decided.**
+
+1. **A second address, `/status`.** It gives the same answer as `/health`, and the page asks it
+   instead. The name was run through the same lists first, and it passes. `/health` stays: `curl` and
+   monitors have no content blocker, and `/health` is the name people expect.
+2. **The page no longer needs all three answers.** The forecast is the one it cannot do without. If
+   the status or the record does not arrive, the page draws the rest and says which address gave no
+   answer, and that a content blocker can cause that. Before, one missing answer emptied the page.
+3. Checked with the same lists: none of their "hide this element" rules hides a part of the page.
+
+**What was missed.** Before the page went in, it was run in a browser in each state. That browser had
+no content blocker. Many real browsers have one, and the first real one did.
+
+**Still open.**
+
+- Lists change. One day another list may stop another address. The page now survives that for the
+  status and the record, not for the forecast.
+- Other blockers' own lists (AdGuard, for example) were not checked.
+
+182 automated tests as of today (147 without a database, 35 against Postgres).

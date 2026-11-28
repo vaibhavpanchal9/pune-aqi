@@ -17,8 +17,14 @@
   Pashan, Pune: the air a day ahead. The live page of the pune-aqi project.
 
   One file, no libraries. The page asks the public service three questions
-  (/forecast, /stats, /health) and draws the answers. Every number on it
+  (/forecast, /stats, /status) and draws the answers. Every number on it
   comes from those answers; nothing is typed in by hand.
+
+  /status is the service's /health under a second name. Content blockers stop
+  a page from asking any address that starts with onrender.com/health, and on
+  its first day this page did not work in Brave because of that. The forecast
+  is the one answer the page cannot do without: if one of the other two does
+  not arrive, the rest is still drawn and the page says what is missing.
 
   The parts, in order:
     1. colours and type      (the <style> block below)
@@ -346,6 +352,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 <!-- ============ the record ============ -->
 <section class="record" aria-labelledby="rec-h">
   <h2 id="rec-h">How it has done so far</h2>
+  <p class="intro" id="rec-missing" hidden>The record did not arrive this time, so it is not shown. The forecast above is live.</p>
+  <div id="rec-body">
   <p class="intro" id="rec-intro"></p>
 
   <h3>Average miss, in µg/m³</h3>
@@ -370,6 +378,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       </table>
     </div>
   </details>
+  </div>
 </section>
 
 <!-- ============ where it loses ============ -->
@@ -400,7 +409,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     <a id="l-docs" href="#">The service's own documentation</a>
     <a id="l-forecast" href="#">/forecast</a>
     <a id="l-stats" href="#">/stats</a>
-    <a id="l-health" href="#">/health</a>
+    <a id="l-health" href="#">/status</a>
   </p>
   <p class="asked"><span id="asked"></span><button type="button" id="again">Ask again</button></p>
 </section>
@@ -432,6 +441,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 "use strict";
 
 const API = "https://pune-aqi-api.onrender.com";     // the public service
+const ASK = { health: "/status", stats: "/stats", forecast: "/forecast" };   // not /health: see the top of this file
 const PATIENCE = 75000;                               // give up after this many milliseconds
 const IST = "Asia/Kolkata";
 
@@ -500,12 +510,16 @@ async function loadLive() {
   const alarm = setTimeout(() => stop.abort(), PATIENCE);
 
   try {
-    const [health, stats, forecast] = await Promise.all(
-      ["/health", "/stats", "/forecast"].map(path => ask(path, stop.signal)));
-    now = { health: health.body, stats: stats.body, forecast: forecast.body, saved: null,
-            tookMs: Math.max(health.tookMs, stats.tookMs, forecast.tookMs),
-            serverMs: [health, stats, forecast].every(a => a.serverMs !== null)
-                      ? health.serverMs + stats.serverMs + forecast.serverMs : null };
+    // Ask all three at once, and wait until each has answered or failed. One failure must not sink the page.
+    const [health, stats, forecast] = await Promise.allSettled(
+      [ASK.health, ASK.stats, ASK.forecast].map(path => ask(path, stop.signal)));
+    if (forecast.status !== "fulfilled") throw forecast.reason;          // without the forecast there is nothing to show
+    const arrived = [health, stats, forecast].filter(a => a.status === "fulfilled").map(a => a.value);
+    now = { health: health.status === "fulfilled" ? health.value.body : null,
+            stats: stats.status === "fulfilled" ? stats.value.body : null,
+            forecast: forecast.value.body, saved: null,
+            tookMs: Math.max(...arrived.map(a => a.tookMs)),
+            serverMs: arrived.every(a => a.serverMs !== null) ? arrived.reduce((sum, a) => sum + a.serverMs, 0) : null };
     draw();
   } catch (problem) {
     if (first) showFailure(); else $("asked").textContent = "The service did not answer this time. The page still shows the last answers.";
@@ -570,7 +584,7 @@ function draw() {
 // The line at the top right: is the pipeline alive?
 function drawPulse() {
   const h = now.health, box = $("pulse");
-  if (!h.pipeline.last_ok_run || !h.data.newest_reading) { box.hidden = true; return; }
+  if (!h || !h.pipeline.last_ok_run || !h.data.newest_reading) { box.hidden = true; return; }
   const lastRun = new Date(h.pipeline.last_ok_run), newest = new Date(h.data.newest_reading);
   let kind = "ok", words;
   if (h.status === "ok") {
@@ -776,6 +790,8 @@ function meter(label, small, share) {
 
 function drawRecord() {
   const s = now.stats;
+  $("rec-missing").hidden = Boolean(s); $("rec-body").hidden = !s;
+  if (!s) return;
   const live = (s.live_by_tier || []).find(t => t.tier === "full") || s.live;        // the main model, live
   const main = (s.tiers || []).find(t => t.name === "full");
   const test = main ? main.walk_forward : null;                                      // the same model in the test
@@ -809,21 +825,24 @@ function drawRecord() {
 function drawFacts() {
   const h = now.health, s = now.stats, f = now.forecast, parts = [];
   if (f.station) parts.push("The station's official name is " + f.station + ".");
-  parts.push("The job ran " + h.pipeline.runs_last_24h + " times in the last 24 hours.");
-  if (h.data.hours_since_newest !== undefined)
+  if (h) parts.push("The job ran " + h.pipeline.runs_last_24h + " times in the last 24 hours.");
+  if (h && h.data.hours_since_newest !== undefined)
     parts.push("The newest reading is " + one(h.data.hours_since_newest) + " hours old: the station publishes late.");
   const utcDay = t => ["numeric", "long", "numeric"].map((style, k) =>                                      // as in the README
     part(new Date(t), { [["day", "month", "year"][k]]: style, timeZone: "UTC" })).join(" ");
-  if (s.trained_on) parts.push("The model learned from " + thousands(s.trained_on.rows) + " hours of readings, " +
+  if (s && s.trained_on) parts.push("The model learned from " + thousands(s.trained_on.rows) + " hours of readings, " +
     utcDay(s.trained_on.from) + " to " + utcDay(s.trained_on.through) + ".");
   $("facts").textContent = parts.join(" ");
 
-  $("l-docs").href = API + "/docs"; $("l-forecast").href = API + "/forecast"; $("l-stats").href = API + "/stats"; $("l-health").href = API + "/health";
+  $("l-docs").href = API + "/docs"; $("l-forecast").href = API + "/forecast"; $("l-stats").href = API + ASK.stats; $("l-health").href = API + ASK.health;
 
   const asked = new Date(f.generated_at);
   let line = (now.saved ? "These answers are from " : "Asked on ") + weekday(asked) + " " + dayMonth(asked) + " at " + clock(asked) + ".";
   if (now.tookMs !== null) line += " The answers came back in " + Math.round(now.tookMs) + " ms" +
     (now.serverMs !== null ? "; the service itself worked for " + one(now.serverMs) + " ms." : ".");
+  const missing = [!h && ASK.health, !s && ASK.stats].filter(Boolean);
+  if (missing.length) line += " No answer came from " + missing.join(" and ") +
+    ". A content blocker in the browser can stop a request like that.";
   $("asked").textContent = line;
   $("again").textContent = now.saved ? "Try the live service" : "Ask again";
 }

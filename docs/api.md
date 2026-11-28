@@ -112,3 +112,9 @@ curl -s -D - -o /dev/null -H "Origin: https://example.org" https://pune-aqi-api.
 ```
 
 The setting is one line in `app.py`. Three tests in `tests/test_api.py` hold it in place.
+
+**`GET /status` (added the same day).** The same answer as `/health` under a second name. Content
+blockers stop a web page from asking any address that starts with `onrender.com/health`: the
+EasyPrivacy list, which Brave and uBlock Origin use, has the rule `||onrender.com/health`. In Brave
+the live page could not read `/health`, so it asks `/status`. `/health` stays for `curl` and for
+monitors, which no blocker touches.
